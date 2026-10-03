@@ -15,21 +15,26 @@
 
 ## 3. 数据与环境契约
 
-- `REMOTE_MCP_TOKEN` 提供凭据，`--token-file` 显式文件优先。Token 为非空可打印 ASCII，不允许空白；Unix 凭据文件不得向组或其他账号开放权限。
-- `Authorization: Bearer <Token>` 对每个请求校验；请求带 Origin 时必须匹配允许源。
+- Token 可选：未指定 `--token-file` 且 `REMOTE_MCP_TOKEN` 未设置或为空时启用匿名接入。非空 Token 必须为不含空白的可打印 ASCII，最多 8 KiB。
+- `--token-file` 显式文件优先；文件为空、不可读、内容非法或 Unix 权限向组/其他账号开放时必须报错，不能退回匿名接入或环境变量。
+- 服务配置非空 Token 时，每个请求校验 `Authorization: Bearer <Token>`；匿名模式不要求该请求头。两种模式均保留 Origin 校验、TLS 和资源限额。
+- 辅助命令复用相同凭据加载规则；无 Token 时不发送 Authorization，有 Token 时发送 Bearer 凭据。
 - 上传创建参数为 `request_id/path/size/sha256/overwrite`；分块为 `id/offset/data`，其中 data 为 Base64，offset 和 size 为原始字节数。
 - 下载读取参数为 `id/offset/length`，结果复用 `transfer.Result`；调用者验证哈希、长度和状态后才宣称成功。
 - 普通命令参数为 `request_id/command/args/dir/env/background/timeout_ms/wait_ms`；shell 解释只在显式执行 shell 时发生。
 - 终端输入为 `id/data_base64`，尺寸为 `id/columns/rows`。Ctrl+C 的原始字节 0x03 编码为 `Aw==`，程序可以自行处理或忽略该输入。
 - 输出包含 `start_cursor/next_cursor/end_cursor/truncated/data_base64/text/valid_utf8`。原始字节是权威数据，文本视图不能代替二进制还原。
 - 普通进程分别读取 stdout、stderr；终端只提供合并 terminal 流，保留控制序列。
-- 启动输出格式为 `mcpServers.remote-mcp` 下的 `type/url/headers`，每个 IP 独立 JSON，实际 URL 来源于已绑定监听器。
+- 启动输出为 `mcpServers.remote-mcp` 下的 `type/url`，配置非空 Token 时才包含 `headers.Authorization`；匿名模式完全省略 `headers`。每个 IP 独立 JSON，实际 URL 来源于已绑定监听器。
 
 ## 4. 校验与错误矩阵
 
 | 条件 | 预期行为 |
 | --- | --- |
-| Token 缺失或错误 | HTTP 401，不执行工具 |
+| 服务未配置 Token，请求不含 Authorization | 可初始化并调用工具 |
+| 服务已配置 Token，请求凭据缺失或错误 | HTTP 401，不执行工具 |
+| 显式 Token 文件为空、不可读或非法 | 配置失败，不切换匿名模式 |
+| 环境变量 Token 非空但格式非法 | 配置失败 |
 | 不允许的 Origin | HTTP 403 |
 | 无效工具参数、偏移或尺寸 | 稳定业务错误，不 panic |
 | 默认上传到已有文件 | 冲突，原文件保持 |
@@ -43,6 +48,7 @@
 ## 5. 正常、边界与失败示例
 
 - 正常：分块上传程序，校验后通过进程工具运行，再下载产物；Unix 可通过命令工具设置执行权限。
+- 正常：不设置 Token，直接启动服务与辅助命令，完成匿名 MCP 上传和下载；设置非空 Token 后使用相同凭据连接。
 - 边界：空文件仍走创建、完成和空内容 SHA-256 校验；无需伪造空写块。
 - 失败：后台日志超过输出缓冲后，从旧游标读取必须看到 truncated，不能返回看似完整的日志。
 - 失败：启动时有两个网卡地址但仅绑定其中一个，只能输出该地址，不能输出未监听地址或 0.0.0.0。
@@ -51,9 +57,15 @@
 
 对应测试入口为 `internal/server/*_test.go`、`internal/config/*_test.go`、文件与执行模块测试以及辅助命令测试。断言要覆盖原目标未损坏、ID 没有重复创建、内存/记录有界、配置可解析、普通日志无 Token、进程树及文件句柄清理。
 
+鉴权变更须覆盖匿名初始化及真实工具调用、匿名上传下载、带 Token 模式下缺失/错误凭据的 401、多 IP 匿名配置没有 headers、匿名客户端不发送 Authorization、显式文件错误不降级。检查空 Token 不会导致日志工具名全部被脱敏过滤。
+
 Linux 本机运行、Windows/macOS 原生运行和六组合构建分别记账。没有对应环境时保留未验证状态，不能用模拟终端消除真实平台验收要求。
 
 ## 7. 错误方式与正确方式
+
+错误：空 Token 仍生成 `Authorization: Bearer `，或捕获 Token 文件错误后以匿名模式继续运行。
+
+正确：空配置明确对应匿名模式，配置输出及客户端均省略鉴权头；显式凭据配置错误仍失败。
 
 错误：直接把二进制 Base64 交给模型逐块复述，并用整文件 `ReadFile` 构造请求。
 

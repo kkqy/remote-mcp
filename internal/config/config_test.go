@@ -31,7 +31,7 @@ func TestToken(t *testing.T) {
 			t.Fatal("应拒绝开放权限的凭据文件")
 		}
 	}
-	for _, bad := range []string{"", "a\nb", "a b", "中文"} {
+	for _, bad := range []string{"a\nb", "a b", "中文"} {
 		if err := ValidateToken(bad); err == nil {
 			t.Fatalf("应拒绝不合法Token")
 		}
@@ -60,5 +60,40 @@ func TestParseAndValidation(t *testing.T) {
 	c.AllowedOrigins = []string{"https://agent.example/path"}
 	if c.Validate() == nil {
 		t.Fatal("错误Origin应拒绝")
+	}
+}
+
+func TestOptionalToken(t *testing.T) {
+	for _, value := range []string{"", "fictional-token", " ", "a\nb", "中文", strings.Repeat("a", 8193)} {
+		t.Run(value[:min(len(value), 20)], func(t *testing.T) {
+			t.Setenv("REMOTE_MCP_TOKEN", value)
+			c, err := Parse(nil, &bytes.Buffer{})
+			valid := value == "" || value == "fictional-token"
+			if valid && (err != nil || c.Token != value) || !valid && err == nil {
+				t.Fatal("可选环境 Token 校验结果不符")
+			}
+		})
+	}
+	t.Setenv("REMOTE_MCP_TOKEN", "")
+	if err := os.Unsetenv("REMOTE_MCP_TOKEN"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Parse(nil, &bytes.Buffer{}); err != nil {
+		t.Fatal("未设置环境变量应允许启动", err)
+	}
+	t.Setenv("REMOTE_MCP_TOKEN", "fictional-token")
+	file := filepath.Join(t.TempDir(), "token")
+	for _, contents := range []string{"", " \n\t", "bad token", "中文"} {
+		if err := os.WriteFile(file, []byte(contents), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Parse([]string{"--token-file", file}, &bytes.Buffer{}); err == nil {
+			t.Fatal("显式无效文件不能退回环境凭据或匿名")
+		}
+	}
+	for _, path := range []string{"", filepath.Join(t.TempDir(), "missing"), t.TempDir()} {
+		if _, err := Parse([]string{"--token-file", path}, &bytes.Buffer{}); err == nil {
+			t.Fatal("无效凭据文件路径应报错")
+		}
 	}
 }

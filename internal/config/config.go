@@ -35,7 +35,7 @@ func Parse(args []string, stderr io.Writer) (Config, error) {
 	fs.SetOutput(io.Discard)
 	var tokenFile, origins string
 	fs.StringVar(&c.Listen, "listen", c.Listen, "监听 IP 和端口；端口 0 自动分配")
-	fs.StringVar(&tokenFile, "token-file", "", "Token 文件；默认读取 REMOTE_MCP_TOKEN")
+	fs.StringVar(&tokenFile, "token-file", "", "可选 Token 文件；默认读取 REMOTE_MCP_TOKEN，未配置时允许匿名访问")
 	fs.StringVar(&c.TLSCert, "tls-cert", "", "TLS 证书文件")
 	fs.StringVar(&c.TLSKey, "tls-key", "", "TLS 私钥文件")
 	fs.StringVar(&origins, "allowed-origins", "", "允许的 Origin，逗号分隔；默认拒绝所有带 Origin 的请求")
@@ -68,6 +68,15 @@ func Parse(args []string, stderr io.Writer) (Config, error) {
 	}
 	if fs.NArg() != 0 {
 		return c, errors.New("不接受位置参数")
+	}
+	tokenFileSet := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "token-file" {
+			tokenFileSet = true
+		}
+	})
+	if tokenFileSet && tokenFile == "" {
+		return c, errors.New("Token 文件路径不能为空")
 	}
 	var err error
 	c.Token, err = LoadToken(tokenFile)

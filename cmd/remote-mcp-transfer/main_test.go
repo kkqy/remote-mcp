@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"remote-mcp/internal/config"
+	"remote-mcp/internal/server"
 	"remote-mcp/internal/transfer"
 )
 
@@ -308,5 +310,52 @@ func TestUploadIDAcrossMCPSessions(t *testing.T) {
 	}
 	if info, err := os.Stat(path); err != nil || info.Size() != 0 {
 		t.Fatal("跨会话未发布文件")
+	}
+}
+
+func TestAnonymousCLITransfer(t *testing.T) {
+	t.Setenv("REMOTE_MCP_TOKEN", "")
+	app, err := server.New(config.Default(), io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Close()
+	var requests atomic.Int64
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		if _, exists := r.Header["Authorization"]; exists {
+			t.Error("匿名辅助命令不应发送 Authorization")
+			http.Error(w, "意外凭据", 400)
+			return
+		}
+		app.Handler.ServeHTTP(w, r)
+	}))
+	defer ts.Close()
+	dir := t.TempDir()
+	source, remote, target := filepath.Join(dir, "source"), filepath.Join(dir, "remote"), filepath.Join(dir, "target")
+	data := bytes.Repeat([]byte("匿名文件\x00\xff"), 40000)
+	if err := os.WriteFile(source, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	uploaded := execute(t, "upload", "--url", ts.URL+"/mcp", source, remote)
+	downloaded := execute(t, "download", "--url", ts.URL+"/mcp", remote, target)
+	got, err := os.ReadFile(target)
+	sum := sha256.Sum256(data)
+	if err != nil || !bytes.Equal(got, data) || uploaded.SHA256 != hex.EncodeToString(sum[:]) || downloaded.SHA256 != uploaded.SHA256 || downloaded.Size != int64(len(data)) || requests.Load() == 0 {
+		t.Fatal("匿名双向传输校验失败")
+	}
+}
+
+func TestCLIRejectsExplicitInvalidTokenFile(t *testing.T) {
+	t.Setenv("REMOTE_MCP_TOKEN", "fictional-token")
+	file := filepath.Join(t.TempDir(), "empty-token")
+	if err := os.WriteFile(file, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"", file, filepath.Join(t.TempDir(), "missing")} {
+		var out, diagnostic bytes.Buffer
+		if run(context.Background(), []string{"upload", "--url", "http://127.0.0.1:1/mcp", "--token-file", path, "a", "b"}, &out, &diagnostic) == 0 || !bytes.Contains(diagnostic.Bytes(), []byte("Token 文件")) {
+			t.Fatal("显式凭据文件错误应在连接前报告", diagnostic.String())
+		}
 	}
 }

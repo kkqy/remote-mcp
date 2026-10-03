@@ -8,7 +8,8 @@ import (
 	"strings"
 )
 
-// LoadToken 从权限受控文件或环境变量读取凭据，错误信息不包含凭据和文件内容。
+// LoadToken 从权限受控文件或环境变量读取可选凭据；空环境变量表示匿名访问。
+// 显式凭据文件必须有效且非空，错误信息不包含凭据和文件内容。
 func LoadToken(file string) (string, error) {
 	token := os.Getenv("REMOTE_MCP_TOKEN")
 	if file != "" {
@@ -29,6 +30,9 @@ func LoadToken(file string) (string, error) {
 			return "", errors.New("无法读取 Token 文件")
 		}
 		token = strings.TrimSpace(string(data))
+		if token == "" {
+			return "", errors.New("Token 文件不能为空")
+		}
 	}
 	if err := ValidateToken(token); err != nil {
 		return "", err
@@ -37,8 +41,8 @@ func LoadToken(file string) (string, error) {
 }
 
 func ValidateToken(token string) error {
-	if token == "" || len(token) > 8192 {
-		return errors.New("请通过 REMOTE_MCP_TOKEN 或 --token-file 提供非空 Token（最多 8 KiB）")
+	if len(token) > 8192 {
+		return errors.New("Token 最多为 8 KiB")
 	}
 	for _, b := range []byte(token) {
 		if b <= 32 || b >= 127 {

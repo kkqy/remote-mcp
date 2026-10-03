@@ -64,11 +64,13 @@ def stop_service(service, timeout=15):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bin-dir", default="dist/linux-amd64", help="两个二进制所在目录")
+    parser.add_argument("--no-token", action="store_true", help="验证未配置 Token 的匿名模式")
     args = parser.parse_args()
     binary_dir = Path(args.bin_dir).resolve()
     suffix = ".exe" if os.name == "nt" else ""
     environment = os.environ.copy()
-    environment["REMOTE_MCP_TOKEN"] = "smoke-" + uuid.uuid4().hex
+    token = "" if args.no_token else "smoke-" + uuid.uuid4().hex
+    environment["REMOTE_MCP_TOKEN"] = token
     with tempfile.TemporaryDirectory(prefix="remote-mcp-smoke-") as directory:
         root = Path(directory)
         logs = (root / "server.log").open("w+")
@@ -78,13 +80,19 @@ def main():
         )
         try:
             config = read_startup(service)
-            endpoint = config["mcpServers"]["remote-mcp"]["url"]
+            entry = config["mcpServers"]["remote-mcp"]
+            endpoint = entry["url"]
+            if token:
+                assert entry["headers"] == {"Authorization": "Bearer " + token}
+            else:
+                assert "headers" not in entry, "匿名启动配置不应包含 headers"
             headers = {
-                "Authorization": "Bearer " + environment["REMOTE_MCP_TOKEN"],
                 "Content-Type": "application/json",
                 "Accept": "application/json, text/event-stream",
                 "MCP-Protocol-Version": "2025-11-25",
             }
+            if token:
+                headers["Authorization"] = "Bearer " + token
             sequence = 0
 
             def rpc(method, params, notification=False):
@@ -149,12 +157,16 @@ def main():
             received = transfer("download", artifact, downloaded)
             assert downloaded.read_bytes() == expected
             assert received["sha256"] == hashlib.sha256(expected).hexdigest()
-            print(json.dumps({"ok": True, "platform": platform.platform(), "architecture": platform.machine(), "bytes": len(expected), "sha256": received["sha256"]}, ensure_ascii=False))
+            print(json.dumps({"ok": True, "authentication": "token" if token else "anonymous", "platform": platform.platform(), "architecture": platform.machine(), "bytes": len(expected), "sha256": received["sha256"]}, ensure_ascii=False))
         finally:
             try:
                 stop_service(service)
                 logs.seek(0)
-                assert environment["REMOTE_MCP_TOKEN"] not in logs.read(), "普通日志泄漏凭据"
+                diagnostic = logs.read()
+                if token:
+                    assert token not in diagnostic, "普通日志泄漏凭据"
+                else:
+                    assert "允许匿名访问" in diagnostic, "启动日志应说明匿名模式"
             finally:
                 logs.close()
 

@@ -36,11 +36,17 @@ func testApp(t *testing.T) (*App, *httptest.Server) {
 }
 func rpc(t *testing.T, client *http.Client, endpoint, session, body string) (*http.Response, map[string]any) {
 	t.Helper()
+	return rpcWithToken(t, client, endpoint, session, body, testToken)
+}
+func rpcWithToken(t *testing.T, client *http.Client, endpoint, session, body, token string) (*http.Response, map[string]any) {
+	t.Helper()
 	req, err := http.NewRequest(http.MethodPost, endpoint, strings.NewReader(body))
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Authorization", "Bearer "+testToken)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json, text/event-stream")
 	req.Header.Set("MCP-Protocol-Version", ProtocolVersion)
@@ -284,5 +290,77 @@ func TestRunTLS(t *testing.T) {
 		}
 	case <-time.After(7 * time.Second):
 		t.Fatal("TLS关闭超时")
+	}
+}
+
+func TestAnonymousRunAndProtocol(t *testing.T) {
+	c := config.Default()
+	c.Listen = "127.0.0.1:0"
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ready := make(chan []byte, 8)
+	done := make(chan error, 1)
+	var diagnostics bytes.Buffer
+	go func() { done <- Run(ctx, c, startupSink{ready}, &diagnostics) }()
+	var data []byte
+	select {
+	case data = <-ready:
+	case err := <-done:
+		t.Fatal(err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("匿名启动超时")
+	}
+	var conf ClientConfig
+	if err := json.Unmarshal(data, &conf); err != nil {
+		t.Fatal(err)
+	}
+	entry := conf.Servers["remote-mcp"]
+	if entry.Headers != nil {
+		t.Fatal("匿名启动不应包含凭据头")
+	}
+	client := &http.Client{Timeout: 5 * time.Second}
+	response, body := rpcWithToken(t, client, entry.URL, "", initialize, "")
+	if response.StatusCode != 200 || body["error"] != nil {
+		t.Fatal(response.StatusCode, body)
+	}
+	session := response.Header.Get("Mcp-Session-Id")
+	response, _ = rpcWithToken(t, client, entry.URL, session, `{"jsonrpc":"2.0","method":"notifications/initialized"}`, "")
+	if response.StatusCode != 202 {
+		t.Fatal(response.StatusCode)
+	}
+	_, body = rpcWithToken(t, client, entry.URL, session, `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`, "")
+	if len(body["result"].(map[string]any)["tools"].([]any)) != 18 {
+		t.Fatal("匿名工具发现失败")
+	}
+	file := filepath.Join(t.TempDir(), "example.txt")
+	if err := os.WriteFile(file, []byte("匿名调用"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	params, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": map[string]any{"name": "file_stat", "arguments": map[string]any{"path": file}}})
+	_, body = rpcWithToken(t, client, entry.URL, session, string(params), "")
+	if body["error"] != nil || body["result"].(map[string]any)["isError"] == true {
+		t.Fatal(body)
+	}
+	req, _ := http.NewRequest(http.MethodPost, entry.URL, strings.NewReader(initialize))
+	req.Header.Set("Origin", "https://evil.example")
+	response, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != 403 {
+		t.Fatal("匿名模式仍须校验 Origin", response.StatusCode)
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(7 * time.Second):
+		t.Fatal("匿名关闭超时")
+	}
+	if !strings.Contains(diagnostics.String(), "tool=file_stat") {
+		t.Fatal("空 Token 不应导致工具名被脱敏", diagnostics.String())
 	}
 }

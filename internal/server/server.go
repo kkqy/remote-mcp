@@ -64,7 +64,7 @@ func New(c config.Config, diagnostics io.Writer) (*App, error) {
 				name := "未知工具"
 				if request, ok := req.(*mcp.CallToolRequest); ok && request != nil && request.Params != nil {
 					candidate := request.Params.Name
-					if len(candidate) <= 64 && !strings.Contains(candidate, c.Token) && strings.Trim(candidate, "abcdefghijklmnopqrstuvwxyz0123456789_") == "" {
+					if len(candidate) <= 64 && (c.Token == "" || !strings.Contains(candidate, c.Token)) && strings.Trim(candidate, "abcdefghijklmnopqrstuvwxyz0123456789_") == "" {
 						name = candidate
 					}
 				}
@@ -88,19 +88,21 @@ func New(c config.Config, diagnostics io.Writer) (*App, error) {
 			http.Error(w, "服务正在关闭", http.StatusServiceUnavailable)
 			return
 		}
-		authorization := r.Header.Values("Authorization")
-		valid := false
-		if len(authorization) == 1 {
-			scheme, credential, found := strings.Cut(authorization[0], " ")
-			if found && strings.EqualFold(scheme, "Bearer") {
-				actual := sha256.Sum256([]byte(credential))
-				valid = subtle.ConstantTimeCompare(expected[:], actual[:]) == 1
+		if c.Token != "" {
+			authorization := r.Header.Values("Authorization")
+			valid := false
+			if len(authorization) == 1 {
+				scheme, credential, found := strings.Cut(authorization[0], " ")
+				if found && strings.EqualFold(scheme, "Bearer") {
+					actual := sha256.Sum256([]byte(credential))
+					valid = subtle.ConstantTimeCompare(expected[:], actual[:]) == 1
+				}
 			}
-		}
-		if !valid {
-			w.Header().Set("WWW-Authenticate", `Bearer realm="remote-mcp"`)
-			http.Error(w, "Token 无效或缺失", http.StatusUnauthorized)
-			return
+			if !valid {
+				w.Header().Set("WWW-Authenticate", `Bearer realm="remote-mcp"`)
+				http.Error(w, "Token 无效或缺失", http.StatusUnauthorized)
+				return
+			}
 		}
 		if origin, exists := r.Header["Origin"]; exists && (len(origin) != 1 || !origins[origin[0]]) {
 			http.Error(w, "Origin 不被允许", http.StatusForbidden)

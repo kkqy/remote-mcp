@@ -50,7 +50,11 @@ func (b bearerTransport) CloseIdleConnections() {
 func (b bearerTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	clone := r.Clone(r.Context())
 	clone.Header = r.Header.Clone()
-	clone.Header.Set("Authorization", "Bearer "+b.token)
+	if b.token != "" {
+		clone.Header.Set("Authorization", "Bearer "+b.token)
+	} else {
+		clone.Header.Del("Authorization")
+	}
 	return b.base.RoundTrip(clone)
 }
 func clientFor(endpoint, token, caFile string) (*http.Client, error) {
@@ -268,7 +272,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	// 解析错误可能回显原始参数；帮助仅显示固定默认值，不展示环境中的 URL。
 	flags.SetOutput(io.Discard)
 	endpoint := flags.String("url", "", "MCP HTTP(S) 地址，也可设置 REMOTE_MCP_URL")
-	tokenFile := flags.String("token-file", "", "权限受控的 Token 文件，否则读取 REMOTE_MCP_TOKEN")
+	tokenFile := flags.String("token-file", "", "可选 Token 文件，否则读取 REMOTE_MCP_TOKEN；未配置时不发送凭据")
 	overwrite := flags.Bool("overwrite", false, "允许替换目标文件")
 	caFile := flags.String("ca-file", "", "额外信任的 PEM CA 证书")
 	timeout := flags.Duration("timeout", 30*time.Minute, "整个传输的最大时长")
@@ -289,6 +293,15 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	}
 	if flags.NArg() != 2 || *timeout <= 0 {
 		return fail(errors.New("必须提供源路径、目标路径和正数超时"))
+	}
+	tokenFileSet := false
+	flags.Visit(func(f *flag.Flag) {
+		if f.Name == "token-file" {
+			tokenFileSet = true
+		}
+	})
+	if tokenFileSet && *tokenFile == "" {
+		return fail(errors.New("Token 文件路径不能为空"))
 	}
 	token, err := config.LoadToken(*tokenFile)
 	if err != nil {

@@ -64,6 +64,6 @@
     "scripts/smoke.py",
     "scripts/test_smoke.py"
   ],
-  "notes": "首版功能与独立检查修复已提交，并已纳入master；开发分支已删除。Linux全量race/vet、六组合12二进制构建、真实二进制闭环及257MiB文件流式双向传输均通过。Windows/macOS原生运行及跨系统双端验收待环境，因此保持in_progress。用户已要求将Trellis工作流、平台集成和本地进展记录一并提交。",
+  "notes": "首版功能与Trellis配置已提交至master，开发分支已删除。本次Token可选变更已实现：未配置时匿名，配置后继续鉴权，显式凭据文件错误不降级。相关包race、全量vet、六组合构建及匿名/带Token实际二进制闭环均通过，独立检查通过、无阻塞问题；用户已确认本次功能提交及代码、测试、文档和Trellis记录范围。Windows/macOS原生运行及跨系统双端验收仍待环境，保持in_progress。",
   "meta": {}
 }

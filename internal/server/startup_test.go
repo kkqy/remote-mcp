@@ -88,3 +88,35 @@ func TestExplicitUnusableAddressDoesNotProduceConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestAnonymousStartupConfigurations(t *testing.T) {
+	var out, diag bytes.Buffer
+	enum := func() ([]Interface, error) {
+		return []Interface{{Up: true, Addresses: []netip.Addr{netip.MustParseAddr("192.168.1.10"), netip.MustParseAddr("10.8.0.2")}}}, nil
+	}
+	if err := WriteStartup(&out, &diag, &net.TCPAddr{IP: net.IPv4zero, Port: 8080}, false, "", enum); err != nil {
+		t.Fatal(err)
+	}
+	decoder := json.NewDecoder(&out)
+	for _, want := range []string{"http://10.8.0.2:8080/mcp", "http://192.168.1.10:8080/mcp"} {
+		var conf struct {
+			Servers map[string]map[string]any `json:"mcpServers"`
+		}
+		if err := decoder.Decode(&conf); err != nil {
+			t.Fatal(err)
+		}
+		entry := conf.Servers["remote-mcp"]
+		if _, exists := entry["headers"]; exists {
+			t.Fatal("匿名配置必须完全省略 headers")
+		}
+		if entry["url"] != want || entry["type"] != "http" {
+			t.Fatal(entry)
+		}
+	}
+	if err := decoder.Decode(new(ClientConfig)); !errors.Is(err, io.EOF) {
+		t.Fatal("配置数量错误")
+	}
+	if !strings.Contains(diag.String(), "允许匿名访问") || strings.Contains(diag.String(), "包含当前 Token") {
+		t.Fatal(diag.String())
+	}
+}

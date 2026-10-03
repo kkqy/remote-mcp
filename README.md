@@ -11,59 +11,69 @@ go build -o bin/remote-mcp ./cmd/remote-mcp
 go build -o bin/remote-mcp-transfer ./cmd/remote-mcp-transfer
 ```
 
-Linux/macOS 示例：
+未配置 Token 时可以直接启动。Linux/macOS：
 
 ```sh
-# 用自己生成的随机 Token 替换示例值。
-export REMOTE_MCP_TOKEN='replace-with-a-random-ascii-token'
 ./bin/remote-mcp
 ```
 
-Token 必须是不含空白的可打印 ASCII 字符，请将示例值替换为自己生成的随机凭据。也可将 Token 写入仅当前账号可读的文件：
+Windows PowerShell：
+
+```powershell
+.\remote-mcp.exe
+```
+
+Token 是可选的。未设置 `REMOTE_MCP_TOKEN` 或该变量为空、且未指定 `--token-file` 时，服务允许匿名访问：能连接服务的客户端可使用运行账号的文件和命令权限。若当前终端之前配置过 Token，可用 Bash 的 `unset REMOTE_MCP_TOKEN` 或 PowerShell 的 `$env:REMOTE_MCP_TOKEN = $null` 清除后启动。
+
+需要鉴权时，在启动前配置非空 Token。Linux/macOS：
 
 ```sh
-chmod 600 /安全目录/remote-mcp.token
-./bin/remote-mcp --token-file /安全目录/remote-mcp.token --listen 192.168.1.10:8080
+export REMOTE_MCP_TOKEN='replace-with-a-random-ascii-token'
+./bin/remote-mcp
 ```
 
 Windows PowerShell：
 
 ```powershell
 $env:REMOTE_MCP_TOKEN = 'replace-with-a-random-ascii-token'
-.\remote-mcp.exe --listen 0.0.0.0:8080
+.\remote-mcp.exe
 ```
 
-Windows 的 Token 文件请通过文件 ACL 限制为运行账号可读；程序无法用 Unix 权限位代替 Windows ACL 检查。Token 文件优先于环境变量。服务不接受 Token 命令行参数，避免凭据出现在进程参数中。
+配置的 Token 必须是不含空白的可打印 ASCII 字符，最多 8 KiB。也可使用仅当前账号可读的凭据文件：
+
+```sh
+chmod 600 /安全目录/remote-mcp.token
+./bin/remote-mcp --token-file /安全目录/remote-mcp.token --listen 192.168.1.10:8080
+```
+
+Token 文件优先于环境变量，读取时去除文件首尾空白；显式指定的文件为空、不可读、格式或权限无效时启动失败，不会退回匿名模式。非空但非法的环境 Token 也会报错。Windows 的 Token 文件请通过文件 ACL 限制为运行账号可读；程序无法用 Unix 权限位代替 Windows ACL 检查。服务不接受 Token 命令行值，避免凭据出现在进程参数中。
 
 默认监听所有 IPv4 接口的 `0.0.0.0:8080`。限制为本机可用 `--listen 127.0.0.1:8080`；IPv6 使用 `--listen '[::]:8080'`，仅监听 IPv6，不假定系统支持双栈。端口 `0` 由系统分配，启动配置展示实际端口。停止时使用 Ctrl+C 或正常终止信号，服务清理受管理的进程、终端、传输临时文件及句柄；强杀进程或断电无法保证临时文件清理。
 
 ## 复制启动配置
 
-监听成功后，stdout 为每个启用网卡上的可用 IP 输出一份完整配置。同一网卡上的多个地址也分别展示，重复地址会去重并稳定排序。例如：
+监听成功后，stdout 为每个启用网卡上的可用 IP 输出一份完整配置。同一网卡上的多个地址也分别展示，重复地址会去重并稳定排序。未配置 Token 时例如：
 
 ```json
 {
   "mcpServers": {
     "remote-mcp": {
       "type": "http",
-      "url": "http://192.168.1.10:8080/mcp",
-      "headers": {
-        "Authorization": "Bearer replace-with-your-token"
-      }
+      "url": "http://192.168.1.10:8080/mcp"
     }
   }
 }
 ```
 
-存在 VPN 地址时还会输出它的独立配置。**选择 Agent 可达的一份配置使用**；这些地址属于同一个服务。每段都是独立 JSON 对象，多段合在一起不是单个 JSON 文档。启动输出包含真实 Token，请将其视为凭据保管。中文说明和普通日志写入 stderr，普通日志不记录 Token、环境变量值、文件内容或终端输入输出。
+存在 VPN 地址时还会输出它的独立配置。**选择 Agent 可达的一份配置使用**；这些地址属于同一个服务。每段都是独立 JSON 对象，多段合在一起不是单个 JSON 文档。匿名模式完全省略 `headers`；启用鉴权后，配置会增加 `"headers": {"Authorization": "Bearer <当前 Token>"}`，其中包含真实 Token，请将其视为凭据保管。中文说明和普通日志写入 stderr，普通日志不记录 Token、环境变量值、文件内容或终端输入输出。
 
 全接口展示会排除停用网卡、回环、未指定地址、组播和 IPv6 链路本地地址。单 IP 绑定只显示该地址；显式回环绑定说明仅限本机。网卡枚举失败时服务继续运行并提示手动配置，不输出 `0.0.0.0` 或 `::` 作为连接 URL。列出网卡地址不意味着 Agent 侧路由、防火墙或证书信任已就绪。
 
-配置采用常见的 `mcpServers/type/url/headers` 格式，并非 MCP 协议规定的统一配置文件。其他客户端格式需要使用相同 URL 和 Authorization 值转换。客户端须支持 Streamable HTTP、Bearer Token 和协议版本 **2025-11-25**；不提供 stdio、旧 SSE 或 OAuth 自动发现适配，也不表示已验证所有品牌 Agent。
+配置采用常见的 `mcpServers/type/url/headers` 格式，并非 MCP 协议规定的统一配置文件。其他客户端格式需要使用相同 URL 及可选 Authorization 值转换。客户端须支持 Streamable HTTP 和协议版本 **2025-11-25**；启用鉴权时还需支持 Bearer Token；不提供 stdio、旧 SSE 或 OAuth 自动发现适配，也不表示已验证所有品牌 Agent。
 
 ## 鉴权与 HTTPS
 
-每个 MCP 请求均校验 Token，协议会话 ID 不替代鉴权。持有 Token 即可使用运行账号的文件及命令权限；工作目录不是沙箱，程序不自动提权。进程树回收针对受管理的进程组、终端作业和 Windows Job Object；程序主动脱离 Unix 会话等行为可能无法完整回收，不构成恶意程序隔离。建议用符合调试需要的专用账号启动。
+未配置 Token 时不校验 Authorization。配置非空 Token 后，每个 MCP 请求均校验凭据，缺失或错误返回 HTTP 401，协议会话 ID 不替代鉴权。允许访问的客户端共享运行账号的文件及命令权限；工作目录不是沙箱，程序不自动提权。进程树回收针对受管理的进程组、终端作业和 Windows Job Object；程序主动脱离 Unix 会话等行为可能无法完整回收，不构成恶意程序隔离。建议用符合调试需要的专用账号启动。
 
 加密 VPN 可承载 HTTP；普通内网可配置 HTTPS：
 
@@ -86,12 +96,11 @@ Windows 的 Token 文件请通过文件 ACL 限制为运行账号可读；程序
 辅助命令在 Agent 所在机器上运行，从本地磁盘读取真实字节，经 MCP 分块传输，文件内容不经过模型复述。
 
 ```sh
-export REMOTE_MCP_TOKEN='replace-with-your-token'
 ./bin/remote-mcp-transfer upload --url http://192.168.1.10:8080/mcp ./程序包.zip /客户机目录/程序包.zip
 ./bin/remote-mcp-transfer download --url http://192.168.1.10:8080/mcp /客户机目录/运行日志.txt ./运行日志.txt
 ```
 
-`--url` 可由 `REMOTE_MCP_URL` 提供，Token 支持 `--token-file`。选项放在 `upload` 或 `download` 后、两个路径参数前。使用 `--overwrite` 才允许替换已有目标；上传和下载先写临时文件，大小和 SHA-256 校验通过后提交。失败返回非零退出码，进度写 stderr，最终 JSON 摘要写 stdout，包含 `ok`、`size`、`sha256` 或错误原因。
+默认不需要 Token，辅助命令不发送 Authorization。若服务端已启用鉴权，先设置相同的 `REMOTE_MCP_TOKEN`，或传入 `--token-file`；显式无效文件会报错。`--url` 可由 `REMOTE_MCP_URL` 提供。选项放在 `upload` 或 `download` 后、两个路径参数前。使用 `--overwrite` 才允许替换已有目标；上传和下载先写临时文件，大小和 SHA-256 校验通过后提交。失败返回非零退出码，进度写 stderr，最终 JSON 摘要写 stdout，包含 `ok`、`size`、`sha256` 或错误原因。
 
 单文件默认 4 GiB、原始分块默认 256 KiB。目录请先用系统工具打包，压缩包按普通文件传输；服务不自动解包、不保留文件权限或原始时间戳、不支持目录同步和用户级断点续传。Unix 可执行文件上传后需用命令工具设置执行位，或用解释器运行上传的脚本。
 
@@ -108,7 +117,7 @@ export REMOTE_MCP_TOKEN='replace-with-your-token'
 | `terminal_open` / `terminal_write` / `terminal_read` | 创建真实终端、输入和读取合并输出 |
 | `terminal_resize` / `terminal_status` / `terminal_close` | 调整尺寸、查询及关闭终端 |
 
-创建上传、进程和终端必须传入调用方生成的 `request_id`。同一 ID 和相同参数在记录保留期内返回已有资源，参数变化则报冲突。跨 MCP 连接仍可用应用资源 ID 操作同一 Token 信任域中的资源。网络断开不自动结束后台进程或终端，服务重启不会恢复它们。
+创建上传、进程和终端必须传入调用方生成的 `request_id`。同一 ID 和相同参数在记录保留期内返回已有资源，参数变化则报冲突。跨 MCP 连接仍可用应用资源 ID 操作同一服务的资源；启用鉴权时仍须通过 Token 校验。网络断开不自动结束后台进程或终端，服务重启不会恢复它们。
 
 ### 普通命令和后台进程
 
@@ -174,6 +183,7 @@ go test ./...
 go test -race ./...
 bash scripts/build.sh
 python3 scripts/smoke.py --bin-dir dist/linux-amd64
+python3 scripts/smoke.py --bin-dir dist/linux-amd64 --no-token
 ```
 
 构建脚本生成 `dist/{linux,darwin,windows}-{amd64,arm64}/`，每种组合含两个程序。GitHub Actions 在 Linux、Windows、macOS 执行原生测试及竞态检查，并运行真实二进制上传、执行、下载闭环，另运行六组合构建；本地没有执行过的 CI 不能算验证通过。

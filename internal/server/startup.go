@@ -88,13 +88,18 @@ func CandidateAddresses(bound *net.TCPAddr, enumerate Enumerate) ([]netip.Addr, 
 type ClientEntry struct {
 	Type    string            `json:"type"`
 	URL     string            `json:"url"`
-	Headers map[string]string `json:"headers"`
+	Headers map[string]string `json:"headers,omitempty"`
 }
 type ClientConfig struct {
 	Servers map[string]ClientEntry `json:"mcpServers"`
 }
 
 func WriteStartup(out, diagnostics io.Writer, bound *net.TCPAddr, secure bool, token string, enumerate Enumerate) error {
+	if token == "" {
+		fmt.Fprintln(diagnostics, "未配置 Token，当前允许匿名访问。")
+	} else {
+		fmt.Fprintln(diagnostics, "已启用 Token 鉴权，启动配置包含当前 Token。")
+	}
 	addresses, err := CandidateAddresses(bound, enumerate)
 	if err != nil {
 		fmt.Fprintln(diagnostics, "无法枚举本机地址；服务已监听，请手动配置连接地址。")
@@ -110,13 +115,17 @@ func WriteStartup(out, diagnostics io.Writer, bound *net.TCPAddr, secure bool, t
 	}
 	enc := json.NewEncoder(out)
 	enc.SetIndent("", "  ")
-	fmt.Fprintln(diagnostics, "以下每段 JSON 是同一服务的备选配置，请选择 Agent 可达的一个；配置包含当前 Token。")
+	fmt.Fprintln(diagnostics, "以下每段 JSON 是同一服务的备选配置，请选择 Agent 可达的一个。")
 	for _, ip := range addresses {
 		endpoint := url.URL{Scheme: scheme, Host: net.JoinHostPort(ip.String(), strconv.Itoa(bound.Port)), Path: "/mcp"}
 		if ip.IsLoopback() {
 			fmt.Fprintln(diagnostics, "回环地址仅供本机连接。")
 		}
-		conf := ClientConfig{Servers: map[string]ClientEntry{"remote-mcp": {Type: "http", URL: endpoint.String(), Headers: map[string]string{"Authorization": "Bearer " + token}}}}
+		entry := ClientEntry{Type: "http", URL: endpoint.String()}
+		if token != "" {
+			entry.Headers = map[string]string{"Authorization": "Bearer " + token}
+		}
+		conf := ClientConfig{Servers: map[string]ClientEntry{"remote-mcp": entry}}
 		if err := enc.Encode(conf); err != nil {
 			return fmt.Errorf("写入启动配置失败")
 		}
