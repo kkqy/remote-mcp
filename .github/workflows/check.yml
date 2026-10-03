@@ -1,0 +1,37 @@
+name: 三平台验证
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.x'
+          cache: true
+      - run: go vet ./...
+      - run: go test -race -count=1 ./...
+      - run: go build -o bin/ ./cmd/...
+      - run: python -m unittest discover -s scripts -p test_smoke.py
+      - run: python scripts/smoke.py --bin-dir bin
+  cross-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.x'
+          cache: true
+      - run: bash scripts/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: remote-mcp-binaries
+          path: dist/

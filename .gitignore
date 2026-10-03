@@ -1,0 +1,16 @@
+# 构建产物与本地缓存
+/bin/
+/dist/
+/.cache/
+*.test
+*.test.exe
+coverage.out
+
+# 本地凭据及临时文件
+.env
+*.token
+*.key
+*.pem
+
+# Python 验证脚本缓存
+__pycache__/

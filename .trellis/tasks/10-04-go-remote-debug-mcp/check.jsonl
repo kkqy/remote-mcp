@@ -1,0 +1,4 @@
+{"file":".trellis/tasks/10-04-go-remote-debug-mcp/research/transport-terminal.md","reason":"核对协议鉴权、真实终端能力和跨平台验收限制，避免将交叉编译等同于运行验证"}
+{"file": ".trellis/tasks/10-04-go-remote-debug-mcp/research/implementation-boundaries.md", "reason": "核对模块边界和平台验证的真实范围"}
+{"file": ".trellis/spec/backend/index.md", "reason": "已落地的后端规范索引与质量检查入口"}
+{"file": ".trellis/spec/backend/mcp-contracts.md", "reason": "核对实际MCP工具、凭据、文件与进程跨层契约"}
