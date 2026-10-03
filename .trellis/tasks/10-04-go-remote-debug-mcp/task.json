@@ -64,6 +64,6 @@
     "scripts/smoke.py",
     "scripts/test_smoke.py"
   ],
-  "notes": "首版及可选Token已提交至master。本次启动JSON已改为OpenCode 1.x可直接使用的$schema/mcp/type=remote/enabled=true/oauth=false格式，保留多IP及可选Token。server race、vet、Python回归、六组合构建与两种鉴权模式二进制闭环通过；独立检查通过，无新增问题。用户已确认本次功能提交及范围；.opencode/package.json有无关改动，保留并排除提交。Windows/macOS原生及OpenCode完整客户端验收仍待执行，任务保持in_progress。",
+  "notes": "用户提供Windows原生CI失败，已定位并修复ConPTY终端启动遗漏STARTF_USESTDHANDLES导致沿用宿主重定向标准句柄的问题；保留暂停创建→Job绑定→恢复顺序。新增独立宿主pipe/file重定向回归。Linux execution race、全量vet、Windows amd64/arm64 vet及测试编译、六组合构建通过；独立检查无新增问题。修复后Windows原生运行仍待CI确认，用户已确认本次修复提交及范围。.opencode/package.json为无关改动，保留且排除提交。",
   "meta": {}
 }

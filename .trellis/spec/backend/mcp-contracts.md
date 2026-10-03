@@ -12,6 +12,7 @@
 - 进程工具：`process_start/read/status/stop`。
 - 终端工具：`terminal_open/write/read/resize/status/close`。
 - 本地辅助命令入口：`remote-mcp-transfer upload|download`，CLI 完整参数以程序 `--help` 和 README 为准。
+- Windows 执行适配入口：`(*windowsProcess).spawn(*exec.Cmd, []windows.Handle) error`；终端通过扩展属性指定 HPCON，普通进程通过句柄列表重定向标准输入输出。
 
 ## 3. 数据与环境契约
 
@@ -25,6 +26,8 @@
 - 终端输入为 `id/data_base64`，尺寸为 `id/columns/rows`。Ctrl+C 的原始字节 0x03 编码为 `Aw==`，程序可以自行处理或忽略该输入。
 - 输出包含 `start_cursor/next_cursor/end_cursor/truncated/data_base64/text/valid_utf8`。原始字节是权威数据，文本视图不能代替二进制还原。
 - 普通进程分别读取 stdout、stderr；终端只提供合并 terminal 流，保留控制序列。
+- Windows ConPTY 子进程必须显式设置 `STARTF_USESTDHANDLES`，并将 StdInput/StdOutput/StdErr 保持为 NULL（Go 零值）。仅传 `bInheritHandles=false` 不能阻止父进程重定向的标准句柄被复制；普通进程分支仍使用各自的真实管道句柄。参见 [微软维护者说明](https://github.com/microsoft/terminal/discussions/15814)。
+- Windows 进程始终先 `CREATE_SUSPENDED` 创建，成功绑定 Job Object 后再 `ResumeThread`；不能为修复终端而取消进程树回收约束。
 - 启动输出采用 OpenCode 1.x 配置：顶层 `$schema` 为 `https://opencode.ai/config.json`，`mcp.remote-mcp` 下固定 `type: "remote"`、`enabled: true`、`oauth: false`，并包含实际监听器生成的 `url`。不输出旧的 `mcpServers` 或 `type: "http"`，也不生成本地服务的 command。
 - 配置非空 Token 时才包含 `headers.Authorization`；匿名模式完全省略 `headers`。每个 IP 独立完整 JSON，可选一份合并入 OpenCode 配置，其他客户端需转换格式；不把客户端配置格式与 MCP HTTP 传输协议混为一谈。
 
@@ -46,12 +49,14 @@
 | HTTP 断开 | 不自动停止应用进程或终端 |
 | 监听失败 | 不输出成功连接配置 |
 | 无论有无 Token | 启动 JSON 明确包含 oauth=false，避免客户端尝试 OAuth |
+| Windows 终端的宿主 stdin/stdout/stderr 被重定向 | 输入输出仍经 ConPTY，shell 不因宿主输入 EOF 提前退出 |
 
 ## 5. 正常、边界与失败示例
 
 - 正常：分块上传程序，校验后通过进程工具运行，再下载产物；Unix 可通过命令工具设置执行权限。
 - 正常：不设置 Token，直接启动服务与辅助命令，完成匿名 MCP 上传和下载；设置非空 Token 后使用相同凭据连接。
 - 边界：空文件仍走创建、完成和空内容 SHA-256 校验；无需伪造空写块。
+- 边界：CI 捕获宿主标准输出、输入为 EOF 时，Windows 终端仍可持续输入命令；真正达到空闲时限后状态原因为 idle_timeout。
 - 失败：后台日志超过输出缓冲后，从旧游标读取必须看到 truncated，不能返回看似完整的日志。
 - 失败：启动时有两个网卡地址但仅绑定其中一个，只能输出该地址，不能输出未监听地址或 0.0.0.0。
 
@@ -63,9 +68,15 @@
 
 启动格式验证须用独立 map 解析，检查 mcp/remote/enabled/oauth 的真实字段和值，以及旧字段缺失；不能只复用生产结构体导致错误 JSON 标签同时被写入和读取。同步修改实际二进制验证脚本等启动输出消费者。
 
+Windows 终端须在宿主标准输入为 EOF、输出被重定向的独立子进程中回归，核对状态保持、调整尺寸、Ctrl+C 和 idle_timeout，并检查交互输出没有泄漏到宿主 stdout/stderr。不能只断言创建成功，不能延长等待或放宽退出原因掩盖标准句柄接错。
+
 Linux 本机运行、Windows/macOS 原生运行和六组合构建分别记账。没有对应环境时保留未验证状态，不能用模拟终端消除真实平台验收要求。
 
 ## 7. 错误方式与正确方式
+
+错误：认为 CreateProcess 的 bInheritHandles=false 足以防止 ConPTY 使用父进程的重定向标准句柄。
+
+正确：终端设置 STARTF_USESTDHANDLES 且 Std* 为 NULL，保留 HPCON 扩展属性及 Job 绑定顺序，用宿主重定向场景做原生回归。
 
 错误：把 `mcpServers` 和 `type: "http"` 的配置称作可直接用于 OpenCode，或把远程地址配置为 `type: "local", command: [""]`。
 

@@ -136,6 +136,9 @@ func (p *windowsProcess) spawn(cmd *exec.Cmd, handles []windows.Handle) error {
 	si.Cb = uint32(unsafe.Sizeof(si))
 	si.ProcThreadAttributeList = attrs.List()
 	if p.terminal != nil {
+		// 即使禁止句柄继承，Windows 仍可能复制父进程被重定向的标准句柄。
+		// 显式启用标准句柄且保持三个句柄为零，让子进程连接 ConPTY。
+		si.Flags = windows.STARTF_USESTDHANDLES
 		if err = setConsoleAttribute(attrs, p.terminal.Fd()); err != nil {
 			return err
 		}
