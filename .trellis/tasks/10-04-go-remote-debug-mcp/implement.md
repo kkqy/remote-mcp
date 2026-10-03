@@ -69,3 +69,9 @@
 - 匿名启动配置完全省略 headers，诊断说明鉴权状态；辅助命令不发送 Authorization。
 - 修正空 Token 对工具名称日志筛选的影响，同步文档及启动示例。
 - 验证相关竞态测试、静态检查、六组合构建和两种模式下真实二进制闭环；不重复无关大文件及终端验收。结果见 research/optional-token.md。
+
+## OpenCode 启动配置追加变更
+
+用户确认将启动输出改为 OpenCode 可直接使用的格式。输出为顶层 `$schema` 与 `mcp`，每个 `remote-mcp` 条目包含 `type: remote`、`url`、`enabled: true` 和 `oauth: false`。不增加格式开关或同时输出两种格式；保留逐 IP 独立 JSON、IPv6/TLS/实际端口以及可选 Token 行为。
+
+实现修改 `internal/server/startup.go`，测试独立解码 JSON 检查外部字段；同步 `scripts/smoke.py` 消费者与 README。主会话同步相关后端规范。验证和边界记录于 `research/opencode-output.md`；不改 MCP 协议、文件或终端工具，Windows/macOS 原生验收继续待环境。

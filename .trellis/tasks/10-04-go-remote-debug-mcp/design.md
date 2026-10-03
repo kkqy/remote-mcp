@@ -1,6 +1,6 @@
 # Go 远程调试 MCP 服务技术设计
 
-状态：完整方案已获用户批准；本次按用户最新要求改为可选 Token，产品行为及默认值以 prd.md 为准。
+状态：完整方案已获用户批准；已按用户要求支持可选 Token，并将启动输出改为 OpenCode 配置；产品行为及默认值以 prd.md 为准。
 
 ## 架构与交付边界
 
@@ -27,20 +27,23 @@
 - 单 IP 监听只生成该 IP 的配置。显式回环监听输出回环配置并标注仅本机可用。IPv6 监听按实际接收地址族生成 IPv6 配置，不能假设所有系统的 IPv6 监听都兼容 IPv4。
 - 排除未指定地址、组播地址、停用接口、用于远端展示的回环地址及需要客户端作用域的 IPv6 链路本地地址；按规范化地址去重并稳定排序。同一网卡上的多个 IP 也分别生成。
 - URL 使用实际协议、实际端口和 `/mcp`；IPv6 用标准 URL 构造函数处理方括号，不能手工拼接冒号。
-- 每个地址分别输出一个完整 JSON 对象，顶层为 mcpServers，服务名统一为 remote-mcp，字段包括 type=http、url；仅启用鉴权时包含 headers.Authorization，匿名时完全省略 headers。各对象是备选配置，用户选择一个；不把多个 IP 默认注册为多个重复服务。
+- 每个地址分别输出一个完整 JSON 对象，顶层包含 $schema=https://opencode.ai/config.json 和 mcp，服务名统一为 remote-mcp，字段包括 type=remote、url、enabled=true、oauth=false；仅启用鉴权时包含 headers.Authorization，匿名时完全省略 headers。各对象是备选配置，用户选择一个；不把多个 IP 默认注册为多个重复服务。
 - 通过 JSON 编码器序列化并缩进，不用字符串模板插入 Token。启用鉴权时输出填入实际 Token，便于直接复制；示例文档只使用虚构占位符。不得同时将整份配置复制进结构化运行日志。
 - 每段 JSON 输出到 stdout，中文地址说明、选择提示和普通日志输出到 stderr；多个独立 JSON 对象不宣称整体构成单个 JSON 文档。
 - 枚举失败或没有匹配地址时明确说明，若监听已成功可继续运行；不能退回把 0.0.0.0 或 :: 当成 Agent 连接 URL。回环监听等无需网卡枚举的情况仍可生成确定配置。
 - 地址只代表本机可监听的候选入口，不承诺网络可达；TLS 证书仍需覆盖选用 IP 或由用户配置匹配的域名，不自动关闭客户端证书校验。
-- 常见 JSON 配置格式与客户端协议兼容性分开说明；其他配置格式的 Agent 使用相同 URL 和鉴权值转换，不声称所有客户端能直接导入该 JSON。
+- OpenCode 配置格式与客户端协议兼容性分开说明；其他配置格式的 Agent 使用相同 URL 和鉴权值转换，不声称所有客户端能直接导入该 JSON。
 
 启用鉴权的示例（演示两个备选地址，端口和 Token 在实际启动时替换；匿名模式删除整个 headers 字段）：
 
 ```json
 {
-  "mcpServers": {
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
     "remote-mcp": {
-      "type": "http",
+      "type": "remote",
+      "enabled": true,
+      "oauth": false,
       "url": "http://192.168.1.10:8080/mcp",
       "headers": { "Authorization": "Bearer <当前Token>" }
     }
@@ -50,9 +53,12 @@
 
 ```json
 {
-  "mcpServers": {
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
     "remote-mcp": {
-      "type": "http",
+      "type": "remote",
+      "enabled": true,
+      "oauth": false,
       "url": "http://10.8.0.2:8080/mcp",
       "headers": { "Authorization": "Bearer <当前Token>" }
     }

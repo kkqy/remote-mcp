@@ -64,6 +64,6 @@
     "scripts/smoke.py",
     "scripts/test_smoke.py"
   ],
-  "notes": "首版功能与Trellis配置已提交至master，开发分支已删除。本次Token可选变更已实现：未配置时匿名，配置后继续鉴权，显式凭据文件错误不降级。相关包race、全量vet、六组合构建及匿名/带Token实际二进制闭环均通过，独立检查通过、无阻塞问题；用户已确认本次功能提交及代码、测试、文档和Trellis记录范围。Windows/macOS原生运行及跨系统双端验收仍待环境，保持in_progress。",
+  "notes": "首版及可选Token已提交至master。本次启动JSON已改为OpenCode 1.x可直接使用的$schema/mcp/type=remote/enabled=true/oauth=false格式，保留多IP及可选Token。server race、vet、Python回归、六组合构建与两种鉴权模式二进制闭环通过；独立检查通过，无新增问题。用户已确认本次功能提交及范围；.opencode/package.json有无关改动，保留并排除提交。Windows/macOS原生及OpenCode完整客户端验收仍待执行，任务保持in_progress。",
   "meta": {}
 }

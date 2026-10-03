@@ -80,7 +80,12 @@ def main():
         )
         try:
             config = read_startup(service)
-            entry = config["mcpServers"]["remote-mcp"]
+            assert "mcpServers" not in config, "不应输出旧的 mcpServers 配置"
+            assert config["$schema"] == "https://opencode.ai/config.json"
+            entry = config["mcp"]["remote-mcp"]
+            assert entry["type"] == "remote"
+            assert entry["enabled"] is True
+            assert entry["oauth"] is False
             endpoint = entry["url"]
             if token:
                 assert entry["headers"] == {"Authorization": "Bearer " + token}

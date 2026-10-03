@@ -88,10 +88,13 @@ func CandidateAddresses(bound *net.TCPAddr, enumerate Enumerate) ([]netip.Addr, 
 type ClientEntry struct {
 	Type    string            `json:"type"`
 	URL     string            `json:"url"`
+	Enabled bool              `json:"enabled"`
+	OAuth   bool              `json:"oauth"`
 	Headers map[string]string `json:"headers,omitempty"`
 }
 type ClientConfig struct {
-	Servers map[string]ClientEntry `json:"mcpServers"`
+	Schema  string                 `json:"$schema"`
+	Servers map[string]ClientEntry `json:"mcp"`
 }
 
 func WriteStartup(out, diagnostics io.Writer, bound *net.TCPAddr, secure bool, token string, enumerate Enumerate) error {
@@ -115,17 +118,17 @@ func WriteStartup(out, diagnostics io.Writer, bound *net.TCPAddr, secure bool, t
 	}
 	enc := json.NewEncoder(out)
 	enc.SetIndent("", "  ")
-	fmt.Fprintln(diagnostics, "以下每段 JSON 是同一服务的备选配置，请选择 Agent 可达的一个。")
+	fmt.Fprintln(diagnostics, "以下每段 JSON 是同一服务的 OpenCode 备选配置，请选择 Agent 可达的一份合并到 opencode.json。")
 	for _, ip := range addresses {
 		endpoint := url.URL{Scheme: scheme, Host: net.JoinHostPort(ip.String(), strconv.Itoa(bound.Port)), Path: "/mcp"}
 		if ip.IsLoopback() {
 			fmt.Fprintln(diagnostics, "回环地址仅供本机连接。")
 		}
-		entry := ClientEntry{Type: "http", URL: endpoint.String()}
+		entry := ClientEntry{Type: "remote", URL: endpoint.String(), Enabled: true, OAuth: false}
 		if token != "" {
 			entry.Headers = map[string]string{"Authorization": "Bearer " + token}
 		}
-		conf := ClientConfig{Servers: map[string]ClientEntry{"remote-mcp": entry}}
+		conf := ClientConfig{Schema: "https://opencode.ai/config.json", Servers: map[string]ClientEntry{"remote-mcp": entry}}
 		if err := enc.Encode(conf); err != nil {
 			return fmt.Errorf("写入启动配置失败")
 		}

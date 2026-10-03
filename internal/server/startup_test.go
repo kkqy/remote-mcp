@@ -34,16 +34,13 @@ func TestStartupCandidates(t *testing.T) {
 	}
 	dec := json.NewDecoder(&out)
 	for _, want := range []string{"http://10.8.0.2:1234/mcp", "http://192.168.2.4:1234/mcp"} {
-		var c ClientConfig
-		if err := dec.Decode(&c); err != nil {
-			t.Fatal(err)
-		}
-		entry := c.Servers["remote-mcp"]
-		if entry.URL != want || entry.Type != "http" || entry.Headers["Authorization"] != "Bearer "+token {
-			t.Fatalf("错误配置: %#v", c)
+		entry := decodeOpenCodeEntry(t, dec)
+		headers, ok := entry["headers"].(map[string]any)
+		if entry["url"] != want || !ok || headers["Authorization"] != "Bearer "+token {
+			t.Fatalf("错误配置: %#v", entry)
 		}
 	}
-	if err := dec.Decode(new(ClientConfig)); !errors.Is(err, io.EOF) {
+	if err := dec.Decode(new(map[string]any)); !errors.Is(err, io.EOF) {
 		t.Fatal("存在多余配置")
 	}
 	if strings.Contains(diag.String(), token) {
@@ -53,11 +50,8 @@ func TestStartupCandidates(t *testing.T) {
 	if err := WriteStartup(&out, &diag, &net.TCPAddr{IP: net.ParseIP("2001:db8::2"), Port: 443}, true, token, enum); err != nil {
 		t.Fatal(err)
 	}
-	var c ClientConfig
-	if err := json.Unmarshal(out.Bytes(), &c); err != nil {
-		t.Fatal(err)
-	}
-	if c.Servers["remote-mcp"].URL != "https://[2001:db8::2]:443/mcp" {
+	entry := decodeOpenCodeEntry(t, json.NewDecoder(&out))
+	if entry["url"] != "https://[2001:db8::2]:443/mcp" {
 		t.Fatal(out.String())
 	}
 }
@@ -99,24 +93,45 @@ func TestAnonymousStartupConfigurations(t *testing.T) {
 	}
 	decoder := json.NewDecoder(&out)
 	for _, want := range []string{"http://10.8.0.2:8080/mcp", "http://192.168.1.10:8080/mcp"} {
-		var conf struct {
-			Servers map[string]map[string]any `json:"mcpServers"`
-		}
-		if err := decoder.Decode(&conf); err != nil {
-			t.Fatal(err)
-		}
-		entry := conf.Servers["remote-mcp"]
+		entry := decodeOpenCodeEntry(t, decoder)
 		if _, exists := entry["headers"]; exists {
 			t.Fatal("匿名配置必须完全省略 headers")
 		}
-		if entry["url"] != want || entry["type"] != "http" {
+		if entry["url"] != want {
 			t.Fatal(entry)
 		}
 	}
-	if err := decoder.Decode(new(ClientConfig)); !errors.Is(err, io.EOF) {
+	if err := decoder.Decode(new(map[string]any)); !errors.Is(err, io.EOF) {
 		t.Fatal("配置数量错误")
 	}
 	if !strings.Contains(diag.String(), "允许匿名访问") || strings.Contains(diag.String(), "包含当前 Token") {
 		t.Fatal(diag.String())
 	}
+}
+
+// 独立解码外部配置契约，避免使用生产结构体掩盖 JSON 字段拼写错误。
+func decodeOpenCodeEntry(t *testing.T, decoder *json.Decoder) map[string]any {
+	t.Helper()
+	var conf map[string]any
+	if err := decoder.Decode(&conf); err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := conf["mcpServers"]; exists {
+		t.Fatal("不应输出旧的 mcpServers 配置")
+	}
+	if conf["$schema"] != "https://opencode.ai/config.json" {
+		t.Fatal("OpenCode 配置 schema 错误")
+	}
+	servers, ok := conf["mcp"].(map[string]any)
+	if !ok || len(servers) != 1 {
+		t.Fatal("配置应在 mcp 下提供一个服务")
+	}
+	entry, ok := servers["remote-mcp"].(map[string]any)
+	if !ok || entry["type"] != "remote" || entry["enabled"] != true {
+		t.Fatal("必须启用 remote 类型的服务")
+	}
+	if oauth, exists := entry["oauth"]; !exists || oauth != false {
+		t.Fatal("必须显式设置 oauth 为 false")
+	}
+	return entry
 }

@@ -25,7 +25,8 @@
 - 终端输入为 `id/data_base64`，尺寸为 `id/columns/rows`。Ctrl+C 的原始字节 0x03 编码为 `Aw==`，程序可以自行处理或忽略该输入。
 - 输出包含 `start_cursor/next_cursor/end_cursor/truncated/data_base64/text/valid_utf8`。原始字节是权威数据，文本视图不能代替二进制还原。
 - 普通进程分别读取 stdout、stderr；终端只提供合并 terminal 流，保留控制序列。
-- 启动输出为 `mcpServers.remote-mcp` 下的 `type/url`，配置非空 Token 时才包含 `headers.Authorization`；匿名模式完全省略 `headers`。每个 IP 独立 JSON，实际 URL 来源于已绑定监听器。
+- 启动输出采用 OpenCode 1.x 配置：顶层 `$schema` 为 `https://opencode.ai/config.json`，`mcp.remote-mcp` 下固定 `type: "remote"`、`enabled: true`、`oauth: false`，并包含实际监听器生成的 `url`。不输出旧的 `mcpServers` 或 `type: "http"`，也不生成本地服务的 command。
+- 配置非空 Token 时才包含 `headers.Authorization`；匿名模式完全省略 `headers`。每个 IP 独立完整 JSON，可选一份合并入 OpenCode 配置，其他客户端需转换格式；不把客户端配置格式与 MCP HTTP 传输协议混为一谈。
 
 ## 4. 校验与错误矩阵
 
@@ -44,6 +45,7 @@
 | 非 UTF-8 输出 | 保留 Base64 原文，文本注明解码状态 |
 | HTTP 断开 | 不自动停止应用进程或终端 |
 | 监听失败 | 不输出成功连接配置 |
+| 无论有无 Token | 启动 JSON 明确包含 oauth=false，避免客户端尝试 OAuth |
 
 ## 5. 正常、边界与失败示例
 
@@ -59,9 +61,15 @@
 
 鉴权变更须覆盖匿名初始化及真实工具调用、匿名上传下载、带 Token 模式下缺失/错误凭据的 401、多 IP 匿名配置没有 headers、匿名客户端不发送 Authorization、显式文件错误不降级。检查空 Token 不会导致日志工具名全部被脱敏过滤。
 
+启动格式验证须用独立 map 解析，检查 mcp/remote/enabled/oauth 的真实字段和值，以及旧字段缺失；不能只复用生产结构体导致错误 JSON 标签同时被写入和读取。同步修改实际二进制验证脚本等启动输出消费者。
+
 Linux 本机运行、Windows/macOS 原生运行和六组合构建分别记账。没有对应环境时保留未验证状态，不能用模拟终端消除真实平台验收要求。
 
 ## 7. 错误方式与正确方式
+
+错误：把 `mcpServers` 和 `type: "http"` 的配置称作可直接用于 OpenCode，或把远程地址配置为 `type: "local", command: [""]`。
+
+正确：OpenCode 1.x 使用 `mcp` 和 `type: "remote"`，本服务明确设置 `oauth: false`。协议可互通不代表客户端配置文件格式相同。
 
 错误：空 Token 仍生成 `Authorization: Bearer `，或捕获 Token 文件错误后以匿名模式继续运行。
 

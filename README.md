@@ -52,13 +52,16 @@ Token 文件优先于环境变量，读取时去除文件首尾空白；显式�
 
 ## 复制启动配置
 
-监听成功后，stdout 为每个启用网卡上的可用 IP 输出一份完整配置。同一网卡上的多个地址也分别展示，重复地址会去重并稳定排序。未配置 Token 时例如：
+监听成功后，stdout 为每个启用网卡上的可用 IP 输出一份完整的 OpenCode 配置。同一网卡上的多个地址也分别展示，重复地址会去重并稳定排序。未配置 Token 时例如：
 
 ```json
 {
-  "mcpServers": {
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
     "remote-mcp": {
-      "type": "http",
+      "type": "remote",
+      "enabled": true,
+      "oauth": false,
       "url": "http://192.168.1.10:8080/mcp"
     }
   }
@@ -69,7 +72,7 @@ Token 文件优先于环境变量，读取时去除文件首尾空白；显式�
 
 全接口展示会排除停用网卡、回环、未指定地址、组播和 IPv6 链路本地地址。单 IP 绑定只显示该地址；显式回环绑定说明仅限本机。网卡枚举失败时服务继续运行并提示手动配置，不输出 `0.0.0.0` 或 `::` 作为连接 URL。列出网卡地址不意味着 Agent 侧路由、防火墙或证书信任已就绪。
 
-配置采用常见的 `mcpServers/type/url/headers` 格式，并非 MCP 协议规定的统一配置文件。其他客户端格式需要使用相同 URL 及可选 Authorization 值转换。客户端须支持 Streamable HTTP 和协议版本 **2025-11-25**；启用鉴权时还需支持 Bearer Token；不提供 stdio、旧 SSE 或 OAuth 自动发现适配，也不表示已验证所有品牌 Agent。
+配置采用 [OpenCode 远程 MCP 格式](https://opencode.ai/docs/mcp-servers/#remote)：顶层为 `mcp`，服务类型为 `remote`，`enabled: true` 启用连接，`oauth: false` 关闭本服务不提供的 OAuth 流程。选择一段 JSON 合并到项目或用户的 `opencode.json`，已有配置只合并对应的 `mcp.remote-mcp` 条目，保留其他设置；重启 OpenCode 后使用 `opencode mcp list` 查看状态。此格式与 OpenCode 1.18.34 对应，不是 MCP 协议规定的统一配置文件；其他客户端须将相同 URL 及可选 Authorization 值转换成其配置格式。客户端须支持 Streamable HTTP 和协议版本 **2025-11-25**；启用鉴权时还需支持 Bearer Token；不提供 stdio、旧 SSE 或 OAuth 自动发现适配，也不表示已验证所有品牌 Agent。
 
 ## 鉴权与 HTTPS
 
