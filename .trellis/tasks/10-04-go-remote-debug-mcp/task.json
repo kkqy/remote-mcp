@@ -12,10 +12,10 @@
   "assignee": "kkqy",
   "createdAt": "2026-10-04",
   "completedAt": null,
-  "branch": "codex/go-remote-debug-mcp",
+  "branch": "master",
   "base_branch": "master",
   "worktree_path": null,
-  "commit": null,
+  "commit": "e2dba301c043ce1b5cda632a4ba7ab5c61459bb9",
   "pr_url": null,
   "subtasks": [],
   "children": [],
@@ -64,6 +64,6 @@
     "scripts/smoke.py",
     "scripts/test_smoke.py"
   ],
-  "notes": "用户已批准实施。三个模块及独立检查修复已完成；最终Linux全量race/vet、六组合12二进制构建和真实二进制闭环均通过。257MiB文件流式双向传输已通过。Windows/macOS原生运行及跨系统双端验收待环境，因此保持in_progress。用户已确认单个功能提交及范围；原有平台初始化文件不纳入。",
+  "notes": "首版功能与独立检查修复已提交，并已纳入master；开发分支已删除。Linux全量race/vet、六组合12二进制构建、真实二进制闭环及257MiB文件流式双向传输均通过。Windows/macOS原生运行及跨系统双端验收待环境，因此保持in_progress。用户已要求将Trellis工作流、平台集成和本地进展记录一并提交。",
   "meta": {}
 }
