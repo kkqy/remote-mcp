@@ -73,3 +73,25 @@
 ### Next Steps
 
 - Windows/macOS原生及跨系统双端验收仍待完成，任务保持进行中。
+
+
+## Session 3: 完成 TCP 端口转发功能
+<!-- trellis-session: v=2 fp=6777f91785fb5d87 -->
+
+**Date**: 2026-10-04
+**Task**: 完成 TCP 端口转发功能
+**Branch**: `codex/port-forwarding`
+
+### Summary
+
+实现 TCP 转发四个 MCP 工具、配置限额、半关闭及退出清理；全量测试、竞态、六组合构建和匿名/Token smoke 通过。独立检查补强可控拨号取消测试。Windows/macOS 原生和跨机器内网仍未验证。用户确认后提交并归档，保留原有 .opencode/package.json 修改。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7b717f6` | feat: 增加 TCP 端口转发功能 |
+
+### Status
+
+[OK] **Completed**

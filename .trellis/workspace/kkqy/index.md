@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 2
+- **Total Sessions**: 3
 - **Last Active**: 2026-10-04
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~75 | Active |
+| `journal-1.md` | ~97 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 3 | 2026-10-04 | 完成 TCP 端口转发功能 | `7b717f6` | `codex/port-forwarding` |
 | 2 | 2026-10-04 | 纳入主分支并提交Trellis配置 | `e2dba30` | `master` |
 | 1 | 2026-10-04 | 远程调试 MCP 首版实现与提交 | `e2dba30` | `codex/go-remote-debug-mcp` |
 <!-- @@@/auto:session-history -->
