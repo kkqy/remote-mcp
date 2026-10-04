@@ -64,6 +64,6 @@
     "scripts/smoke.py",
     "scripts/test_smoke.py"
   ],
-  "notes": "用户提供Windows原生CI失败，已定位并修复ConPTY终端启动遗漏STARTF_USESTDHANDLES导致沿用宿主重定向标准句柄的问题；保留暂停创建→Job绑定→恢复顺序。新增独立宿主pipe/file重定向回归。Linux execution race、全量vet、Windows amd64/arm64 vet及测试编译、六组合构建通过；独立检查无新增问题。修复后Windows原生运行仍待CI确认，用户已确认本次修复提交及范围。.opencode/package.json为无关改动，保留且排除提交。",
+  "notes": "Unix CI终端连续输入误报busy已修复：底层写入结束后先释放inputBusy，再发布结果；取消/超时等待不提前释放仍在执行的写入。新测试在旧实现实际复现，修复后相关race重复30轮、全量race/vet、六组合构建及独立检查通过。dist已更新；本轮Windows/macOS未原生运行，仍需CI确认。用户已确认本次提交到master并推送远端，保留其他任务的端口转发及双语README，排除无关.opencode/package.json。",
   "meta": {}
 }

@@ -24,6 +24,7 @@
 - 下载读取参数为 `id/offset/length`，结果复用 `transfer.Result`；调用者验证哈希、长度和状态后才宣称成功。
 - 普通命令参数为 `request_id/command/args/dir/env/background/timeout_ms/wait_ms`；shell 解释只在显式执行 shell 时发生。
 - 终端输入为 `id/data_base64`，尺寸为 `id/columns/rows`。Ctrl+C 的原始字节 0x03 编码为 `Aw==`，程序可以自行处理或忽略该输入。
+- `Manager.Write(context.Context, WriteInput)` 的完成契约：底层 Write 返回后先释放该终端的 inputBusy，再向调用方发布成功或 I/O 错误结果；顺序调用不能因上一调用的延迟清理得到 busy。等待取消或超时时，底层可能仍在写入，必须保留占用直到真正结束，不能在请求返回时提前释放。
 - 输出包含 `start_cursor/next_cursor/end_cursor/truncated/data_base64/text/valid_utf8`。原始字节是权威数据，文本视图不能代替二进制还原。
 - 普通进程分别读取 stdout、stderr；终端只提供合并 terminal 流，保留控制序列。
 - Windows ConPTY 子进程必须显式设置 `STARTF_USESTDHANDLES`，并将 StdInput/StdOutput/StdErr 保持为 NULL（Go 零值）。仅传 `bInheritHandles=false` 不能阻止父进程重定向的标准句柄被复制；普通进程分支仍使用各自的真实管道句柄。参见 [微软维护者说明](https://github.com/microsoft/terminal/discussions/15814)。
@@ -50,6 +51,8 @@
 | 监听失败 | 不输出成功连接配置 |
 | 无论有无 Token | 启动 JSON 明确包含 oauth=false，避免客户端尝试 OAuth |
 | Windows 终端的宿主 stdin/stdout/stderr 被重定向 | 输入输出仍经 ConPTY，shell 不因宿主输入 EOF 提前退出 |
+| 上一终端写入已返回成功或 I/O 错误后再次顺序调用 | 不因上一调用遗留的占用返回 busy |
+| 底层终端写入仍未完成，包括调用方等待已取消 | 新写入返回 busy，不启动重叠写入 |
 
 ## 5. 正常、边界与失败示例
 
@@ -57,6 +60,7 @@
 - 正常：不设置 Token，直接启动服务与辅助命令，完成匿名 MCP 上传和下载；设置非空 Token 后使用相同凭据连接。
 - 边界：空文件仍走创建、完成和空内容 SHA-256 校验；无需伪造空写块。
 - 边界：CI 捕获宿主标准输出、输入为 EOF 时，Windows 终端仍可持续输入命令；真正达到空闲时限后状态原因为 idle_timeout。
+- 边界：输入等待取消后，后续输入仍须等底层写入实际结束；取消不代表字节未送达，不自动重试。
 - 失败：后台日志超过输出缓冲后，从旧游标读取必须看到 truncated，不能返回看似完整的日志。
 - 失败：启动时有两个网卡地址但仅绑定其中一个，只能输出该地址，不能输出未监听地址或 0.0.0.0。
 
@@ -70,9 +74,15 @@
 
 Windows 终端须在宿主标准输入为 EOF、输出被重定向的独立子进程中回归，核对状态保持、调整尺寸、Ctrl+C 和 idle_timeout，并检查交互输出没有泄漏到宿主 stdout/stderr。不能只断言创建成功，不能延长等待或放宽退出原因掩盖标准句柄接错。
 
+终端输入需要平台无关的可控写入回归：连续顺序调用、真实并发 busy、请求取消后仍持有占用、底层错误后的释放，以及真实 PTY 连续输入。Go race 检测不保证发现所有逻辑竞态；结果发布与资源释放的先后关系须单独断言。
+
 Linux 本机运行、Windows/macOS 原生运行和六组合构建分别记账。没有对应环境时保留未验证状态，不能用模拟终端消除真实平台验收要求。
 
 ## 7. 错误方式与正确方式
+
+错误：goroutine 用 defer 释放输入占用，在 defer 执行前向结果通道发送完成通知。
+
+正确：底层 Write 结束 → 释放输入占用 → 发布结果；请求取消只结束等待，不提前解除仍在运行的写入占用。
 
 错误：认为 CreateProcess 的 bInheritHandles=false 足以防止 ConPTY 使用父进程的重定向标准句柄。
 

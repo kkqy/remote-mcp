@@ -305,7 +305,12 @@ func (m *Manager) Write(ctx context.Context, in WriteInput) (WriteResult, error)
 		err error
 	}
 	result := make(chan outcome, 1)
-	go func() { defer func() { <-r.inputBusy }(); n, err := r.process.Write(data); result <- outcome{n, err} }()
+	go func() {
+		n, err := r.process.Write(data)
+		// 完成通知必须晚于占用释放；取消等待时仍由底层写入负责释放。
+		<-r.inputBusy
+		result <- outcome{n, err}
+	}()
 	timer := time.NewTimer(5 * time.Second)
 	defer timer.Stop()
 	select {
