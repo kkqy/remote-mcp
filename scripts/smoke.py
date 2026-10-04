@@ -74,10 +74,10 @@ def main():
     environment["REMOTE_MCP_TOKEN"] = token
     with tempfile.TemporaryDirectory(prefix="remote-mcp-smoke-") as directory:
         root = Path(directory)
-        logs = (root / "server.log").open("w+")
+        logs = (root / "server.log").open("w+", encoding="utf-8")
         service = subprocess.Popen(
             [str(binary_dir / ("remote-mcp" + suffix)), "--listen", "127.0.0.1:0"],
-            stdout=subprocess.PIPE, stderr=logs, text=True, env=environment,
+            stdout=subprocess.PIPE, stderr=logs, text=True, encoding="utf-8", env=environment,
         )
         try:
             config = read_startup(service)
@@ -185,7 +185,7 @@ def main():
 
             def transfer(operation, source_path, target_path):
                 command = [str(binary_dir / ("remote-mcp-transfer" + suffix)), operation, "--url", endpoint, str(source_path), str(target_path)]
-                completed = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=30, check=True)
+                completed = subprocess.run(command, env=environment, capture_output=True, text=True, encoding="utf-8", timeout=30, check=True)
                 result = json.loads(completed.stdout)
                 assert result["ok"]
                 return result
@@ -205,7 +205,6 @@ def main():
             received = transfer("download", artifact, downloaded)
             assert downloaded.read_bytes() == expected
             assert received["sha256"] == hashlib.sha256(expected).hexdigest()
-            print(json.dumps({"ok": True, "authentication": "token" if token else "anonymous", "platform": platform.platform(), "architecture": platform.machine(), "bytes": len(expected), "sha256": received["sha256"]}, ensure_ascii=False))
         finally:
             try:
                 stop_service(service)
@@ -217,6 +216,7 @@ def main():
                     assert "允许匿名访问" in diagnostic, "启动日志应说明匿名模式"
             finally:
                 logs.close()
+    print(json.dumps({"ok": True, "authentication": "token" if token else "anonymous", "platform": platform.platform(), "architecture": platform.machine(), "bytes": len(expected), "sha256": received["sha256"]}, ensure_ascii=False))
 
 
 if __name__ == "__main__":

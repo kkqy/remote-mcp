@@ -31,6 +31,7 @@
 - Windows 进程始终先 `CREATE_SUSPENDED` 创建，成功绑定 Job Object 后再 `ResumeThread`；不能为修复终端而取消进程树回收约束。
 - 启动输出采用 OpenCode 1.x 配置：顶层 `$schema` 为 `https://opencode.ai/config.json`，`mcp.remote-mcp` 下固定 `type: "remote"`、`enabled: true`、`oauth: false`，并包含实际监听器生成的 `url`。不输出旧的 `mcpServers` 或 `type: "http"`，也不生成本地服务的 command。
 - 配置非空 Token 时才包含 `headers.Authorization`；匿名模式完全省略 `headers`。每个 IP 独立完整 JSON，可选一份合并入 OpenCode 配置，其他客户端需转换格式；不把客户端配置格式与 MCP HTTP 传输协议混为一谈。
+- 服务启动 JSON、普通日志及传输辅助命令文本均为 UTF-8；`scripts/smoke.py` 的文件打开及 subprocess 文本读取必须显式指定 UTF-8。脚本最终成功摘要只在业务、日志检查和清理全部成功后发布。
 
 ## 4. 校验与错误矩阵
 
@@ -53,6 +54,7 @@
 | Windows 终端的宿主 stdin/stdout/stderr 被重定向 | 输入输出仍经 ConPTY，shell 不因宿主输入 EOF 提前退出 |
 | 上一终端写入已返回成功或 I/O 错误后再次顺序调用 | 不因上一调用遗留的占用返回 busy |
 | 底层终端写入仍未完成，包括调用方等待已取消 | 新写入返回 busy，不启动重叠写入 |
+| 验证脚本解码、日志校验或清理失败 | 非零退出，不提前输出 ok=true，不忽略无效编码 |
 
 ## 5. 正常、边界与失败示例
 
@@ -79,6 +81,10 @@ Windows 终端须在宿主标准输入为 EOF、输出被重定向的独立子�
 Linux 本机运行、Windows/macOS 原生运行和六组合构建分别记账。没有对应环境时保留未验证状态，不能用模拟终端消除真实平台验收要求。
 
 ## 7. 错误方式与正确方式
+
+错误：Python 以系统默认代码页读取 Go 的中文输出，在 Windows 上解码失败；或日志检查前就打印成功。
+
+正确：所有 Go 文本输出边界显式使用严格 UTF-8 解码，全部验证与清理通过后才打印成功。
 
 错误：goroutine 用 defer 释放输入占用，在 defer 执行前向结果通道发送完成通知。
 

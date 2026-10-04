@@ -12,8 +12,8 @@
   "assignee": "kkqy",
   "createdAt": "2026-10-04",
   "completedAt": null,
-  "branch": "master",
-  "base_branch": "master",
+  "branch": "main",
+  "base_branch": "main",
   "worktree_path": null,
   "commit": "e2dba301c043ce1b5cda632a4ba7ab5c61459bb9",
   "pr_url": null,
@@ -64,6 +64,6 @@
     "scripts/smoke.py",
     "scripts/test_smoke.py"
   ],
-  "notes": "Unix CI终端连续输入误报busy已修复：底层写入结束后先释放inputBusy，再发布结果；取消/超时等待不提前释放仍在执行的写入。新测试在旧实现实际复现，修复后相关race重复30轮、全量race/vet、六组合构建及独立检查通过。dist已更新；本轮Windows/macOS未原生运行，仍需CI确认。用户已确认本次提交到master并推送远端，保留其他任务的端口转发及双语README，排除无关.opencode/package.json。",
+  "notes": "main分支。Windows smoke在成功完成业务后按cp1252读取UTF-8日志导致失败，现已为日志文件、启动JSON及传输子进程指定严格UTF-8，成功摘要移至全部校验与清理之后。旧实现复现编码错误和提前报成功；最终7项Python回归、Linux两种鉴权模式实际smoke与独立检查通过。Go代码和二进制无需变更，Windows原生仍需CI复验。用户已确认本次提交并推送到kkqy/remote-mcp的main，保留无关.opencode/package.json及既有端口转发、双语README。",
   "meta": {}
 }
