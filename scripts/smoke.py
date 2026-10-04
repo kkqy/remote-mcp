@@ -7,6 +7,7 @@ import os
 import platform
 from pathlib import Path
 import queue
+import socket
 import subprocess
 import tempfile
 import threading
@@ -129,7 +130,49 @@ def main():
             })
             assert initialized["protocolVersion"] == "2025-11-25"
             rpc("notifications/initialized", {}, notification=True)
-            assert len(rpc("tools/list", {})["tools"]) >= 18
+            assert len(rpc("tools/list", {})["tools"]) >= 22
+            with socket.socket() as target:
+                target.bind(("127.0.0.1", 0))
+                target.listen()
+                target.settimeout(5)
+                response_bytes = b"forward-response\x00\xff"
+
+                def respond():
+                    with target.accept()[0] as connection:
+                        connection.settimeout(5)
+                        request_bytes = b""
+                        while True:
+                            chunk = connection.recv(4096)
+                            if not chunk:
+                                break
+                            request_bytes += chunk
+                        if request_bytes == b"forward-request\x00\xff":
+                            connection.sendall(response_bytes)
+
+                responder = threading.Thread(target=respond, daemon=True)
+                responder.start()
+                forward = tool("port_forward_create", {
+                    "request_id": "smoke-forward", "target_host": "127.0.0.1",
+                    "target_port": target.getsockname()[1],
+                })
+                host, port = forward["listen_address"].rsplit(":", 1)
+                assert host == "127.0.0.1"
+                with socket.create_connection((host, int(port)), timeout=5) as connection:
+                    connection.sendall(b"forward-request\x00\xff")
+                    connection.shutdown(socket.SHUT_WR)
+                    data = b""
+                    while True:
+                        chunk = connection.recv(4096)
+                        if not chunk:
+                            break
+                        data += chunk
+                    assert data == response_bytes
+                responder.join(timeout=5)
+                assert not responder.is_alive()
+                assert tool("port_forward_status", {"id": forward["id"]})["state"] == "running"
+                assert tool("port_forward_stop", {"id": forward["id"]})["state"] == "stopped"
+                with socket.socket() as released:
+                    released.bind((host, int(port)))
             source = root / ("source.ps1" if os.name == "nt" else "source.sh")
             remote = root / ("uploaded.ps1" if os.name == "nt" else "uploaded.sh")
             artifact = root / "artifact.txt"

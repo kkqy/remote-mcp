@@ -2,6 +2,7 @@ package config
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -94,6 +95,15 @@ func TestOptionalToken(t *testing.T) {
 	for _, path := range []string{"", filepath.Join(t.TempDir(), "missing"), t.TempDir()} {
 		if _, err := Parse([]string{"--token-file", path}, &bytes.Buffer{}); err == nil {
 			t.Fatal("无效凭据文件路径应报错")
+		}
+	}
+}
+
+func TestForwardingLimits(t *testing.T) {
+	t.Setenv("REMOTE_MCP_TOKEN", "")
+	for _, name := range []string{"max-forwards", "max-forward-connections", "max-forward-records", "forward-dial-timeout", "forward-retention", "forward-sweep-interval"} {
+		if _, err := Parse([]string{"--" + name, "0"}, io.Discard); err == nil {
+			t.Fatalf("%s 未拒绝零值", name)
 		}
 	}
 }

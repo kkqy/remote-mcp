@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"net/url"
 	"remote-mcp/internal/execution"
+	"remote-mcp/internal/forwarding"
 	"remote-mcp/internal/transfer"
 	"strings"
 )
@@ -22,10 +23,11 @@ type Config struct {
 	MaxBodyBytes   int64
 	Transfer       transfer.Config
 	Execution      execution.Config
+	Forwarding     forwarding.Config
 }
 
 func Default() Config {
-	return Config{Listen: "0.0.0.0:8080", MaxBodyBytes: 1 << 20, Transfer: transfer.DefaultConfig(), Execution: execution.DefaultConfig()}
+	return Config{Listen: "0.0.0.0:8080", MaxBodyBytes: 1 << 20, Transfer: transfer.DefaultConfig(), Execution: execution.DefaultConfig(), Forwarding: forwarding.DefaultConfig()}
 }
 
 func Parse(args []string, stderr io.Writer) (Config, error) {
@@ -54,6 +56,12 @@ func Parse(args []string, stderr io.Writer) (Config, error) {
 	fs.IntVar(&c.Execution.MaxTerminals, "max-terminals", c.Execution.MaxTerminals, "最大并发终端数")
 	fs.IntVar(&c.Execution.OutputBytes, "output-bytes", c.Execution.OutputBytes, "每个进程或终端的输出缓冲字节数")
 	fs.IntVar(&c.Execution.ReadBytes, "read-bytes", c.Execution.ReadBytes, "单次输出读取最大字节数")
+	fs.IntVar(&c.Forwarding.MaxRules, "max-forwards", c.Forwarding.MaxRules, "最大活跃 TCP 转发规则数")
+	fs.IntVar(&c.Forwarding.MaxConnections, "max-forward-connections", c.Forwarding.MaxConnections, "TCP 转发全局连接数上限（含拨号中）")
+	fs.IntVar(&c.Forwarding.MaxRecords, "max-forward-records", c.Forwarding.MaxRecords, "TCP 转发最大记录数")
+	fs.DurationVar(&c.Forwarding.DialTimeout, "forward-dial-timeout", c.Forwarding.DialTimeout, "TCP 转发目标连接超时")
+	fs.DurationVar(&c.Forwarding.Retention, "forward-retention", c.Forwarding.Retention, "TCP 转发终态保留时间")
+	fs.DurationVar(&c.Forwarding.SweepInterval, "forward-sweep-interval", c.Forwarding.SweepInterval, "TCP 转发记录清理间隔")
 	fs.Usage = func() {
 		fmt.Fprintln(stderr, "用法：remote-mcp [选项]；启动后每个 IP 输出一份备选 MCP JSON。")
 		fs.SetOutput(stderr)
@@ -115,5 +123,5 @@ func (c Config) Validate() error {
 			return errors.New("Origin 须为不含路径的 http(s) 源地址")
 		}
 	}
-	return nil
+	return c.Forwarding.Validate()
 }

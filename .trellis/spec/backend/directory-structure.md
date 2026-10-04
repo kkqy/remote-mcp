@@ -6,6 +6,7 @@
 - `internal/server/`：HTTP/MCP 接入、鉴权、Origin 校验、监听、启动配置输出和服务关闭。
 - `internal/transfer/`：分块传输状态机、校验、临时文件发布、文件工具及平台提交操作。
 - `internal/execution/`：普通进程、交互终端、输出缓冲、生命周期及 Unix/Windows 系统适配。
+- `internal/forwarding/`：TCP 转发监听、双向流量复制、连接限额及规则生命周期。
 - `scripts/build.sh`：六种系统/架构组合的两个程序构建。
 - `scripts/smoke.py`：使用实际二进制完成上传、独立协议调用、执行和下载校验。
 - `.github/workflows/check.yml`：跨平台检查配置；配置存在不代表远端已经执行成功。

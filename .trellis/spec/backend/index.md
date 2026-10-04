@@ -8,6 +8,7 @@
 2. 阅读 [目录结构](directory-structure.md) 与 [MCP 契约](mcp-contracts.md)。
 3. 涉及错误或输出时，阅读 [错误处理](error-handling.md) 和 [日志规则](logging-guidelines.md)。
 4. 涉及资源生命周期时，阅读 [状态存储](database-guidelines.md)。
+5. 涉及 TCP 转发时，阅读 [端口转发契约](port-forwarding.md)。
 
 ## 质量检查
 

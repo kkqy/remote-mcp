@@ -202,3 +202,39 @@ Linux 还需安装提供 `/bin/ps` 的 `procps`（或发行版对应包），用
 Windows CI 曾发现宿主标准输入输出重定向导致 ConPTY 会话误用宿主句柄的问题，现已修正启动参数，并增加管道及文件重定向宿主下的交互、Ctrl+C 和空闲回收回归测试；修复后的 Windows 原生结果仍需 CI 确认。
 
 本次 Linux/amd64 验证已通过：竞态测试、静态检查、真实二进制上传/执行/下载闭环，以及 257 MiB 实际 MCP 双向传输。该大文件测试约 29.74 秒，采样峰值堆增量约 9.46 MiB，两端 SHA-256 一致；采样堆增量不等同于操作系统 RSS。
+
+## TCP 端口转发
+
+Agent 可通过 MCP 在运行 remote-mcp 的机器上创建独立 TCP 监听端口，访问该机器的本机服务或它能连接的内网服务。例如目标仅监听 `127.0.0.1:3000` 时，调用 `port_forward_create`：
+
+```json
+{"request_id":"preview-3000","target_host":"127.0.0.1","target_port":3000}
+```
+
+也可指定 `listen_host`（明确的 IPv4/IPv6 地址）和 `listen_port`。省略 IP 沿用 `--listen` 的 IP；省略端口或指定 `0` 自动分配。目标可使用 IP 或主机名，不含协议、路径和端口，例如 `192.168.1.20` 或 `dev.internal`。主机名在每次接入时解析。
+
+创建返回 `id`、`listen_address`、`target_address`、`state` 和连接计数。创建成功只代表监听成功。若返回 `0.0.0.0:45678` 或 `[::]:45678`，Agent 应使用运行 remote-mcp 的机器上实际可达的 IP 和该端口访问；需能连接新增端口。IPv4 与 IPv6 按指定地址分别监听，不承诺双栈。
+
+| 工具 | 参数与用途 |
+| --- | --- |
+| `port_forward_create` | 上述创建参数；相同 `request_id` 和相同参数返回同一规则，不同参数返回 `conflict` |
+| `port_forward_list` | `{}`，返回 `forwards` 数组，包含活跃及保留期内终态规则 |
+| `port_forward_status` | `{"id":"返回的资源 ID"}`，查询状态和连接计数 |
+| `port_forward_stop` | `{"id":"返回的资源 ID"}`，关闭监听及已有连接；保留期内重复停止安全 |
+
+状态为 `running`、`stopping`、`stopped` 或 `failed`；`active_connections` 包含拨号中的连接，`total_connections` 包含超限拒绝的接入，`failed_connections` 记录失败连接，`last_error_code` 保留最近错误。目标不可达时记录 `target_connect_failed`，仅关闭本次连接，目标恢复后规则可继续使用；连接超限记录 `connection_limit`。工具失败通过 MCP `isError` 和带 `code/message` 的错误表达。
+
+MCP 会话断开不会停止转发；Agent 用完应调用停止工具。服务正常退出关闭全部转发，重启不恢复。已停止规则的创建重试仍返回终态；要重新建立请使用新的 `request_id`。终态到期或记录容量不足被清理后，旧 ID 查询返回 `not_found`。
+
+管理工具沿用 MCP 鉴权，**转发端口本身不使用 MCP Token 或 MCP 入口 TLS**，目标程序负责认证与 TLS。TCP 字节原样传输，支持半关闭；HTTP Host、重定向和证书名称不会被改写。此功能不提供 UDP、反向隧道或防火墙自动配置。
+
+| 配置参数 | 默认值 |
+| --- | --- |
+| `--max-forwards` | 16 条活跃规则 |
+| `--max-forward-connections` | 全局 256 个连接（含拨号中） |
+| `--forward-dial-timeout` | `10s` |
+| `--forward-retention` | 终态保留 `10m` |
+| `--max-forward-records` | 1024 条记录 |
+| `--forward-sweep-interval` | `30s` |
+
+以上限额和时间必须为正值。连接无应用层空闲超时，超限连接立即关闭，不排队；记录满时优先清理最旧终态，活跃规则的幂等记录不会被驱逐。
