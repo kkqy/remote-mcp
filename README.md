@@ -1,58 +1,60 @@
 # Remote MCP
 
-部署在客户机上的 Go MCP 服务。Agent 通过内网或 VPN 连接客户机，传输文件、运行命令，以及操作真实交互终端。服务包含两个程序：`remote-mcp` 服务端和 `remote-mcp-transfer` 本地文件传输辅助命令。
+**English** | [简体中文](README.zh-CN.md)
 
-## 构建与启动
+A Go MCP service deployed on a remote machine. Agents connect over a local network or VPN to transfer files, run commands, and operate real interactive terminals. The service includes two programs: the `remote-mcp` server and the `remote-mcp-transfer` local file transfer helper.
 
-模块最低要求 Go 1.25，默认使用 Go 1.27 构建，无需 CGO：
+## Build and start
+
+The module requires Go 1.25 or later and builds with Go 1.27 by default. CGO is not required:
 
 ```sh
 go build -o bin/remote-mcp ./cmd/remote-mcp
 go build -o bin/remote-mcp-transfer ./cmd/remote-mcp-transfer
 ```
 
-未配置 Token 时可以直接启动。Linux/macOS：
+You can start the server directly without configuring a token. Linux/macOS:
 
 ```sh
 ./bin/remote-mcp
 ```
 
-Windows PowerShell：
+Windows PowerShell:
 
 ```powershell
 .\remote-mcp.exe
 ```
 
-Token 是可选的。未设置 `REMOTE_MCP_TOKEN` 或该变量为空、且未指定 `--token-file` 时，服务允许匿名访问：能连接服务的客户端可使用运行账号的文件和命令权限。若当前终端之前配置过 Token，可用 Bash 的 `unset REMOTE_MCP_TOKEN` 或 PowerShell 的 `$env:REMOTE_MCP_TOKEN = $null` 清除后启动。
+Token authentication is optional. When `REMOTE_MCP_TOKEN` is unset or empty and `--token-file` is not specified, the service allows anonymous access: any client that can reach it can use the file and command permissions of the account running the service. If a token was previously set in your terminal, clear it before starting with `unset REMOTE_MCP_TOKEN` in Bash or `$env:REMOTE_MCP_TOKEN = $null` in PowerShell.
 
-需要鉴权时，在启动前配置非空 Token。Linux/macOS：
+To enable authentication, configure a nonempty token before starting. Linux/macOS:
 
 ```sh
 export REMOTE_MCP_TOKEN='replace-with-a-random-ascii-token'
 ./bin/remote-mcp
 ```
 
-Windows PowerShell：
+Windows PowerShell:
 
 ```powershell
 $env:REMOTE_MCP_TOKEN = 'replace-with-a-random-ascii-token'
 .\remote-mcp.exe
 ```
 
-配置的 Token 必须是不含空白的可打印 ASCII 字符，最多 8 KiB。也可使用仅当前账号可读的凭据文件：
+Tokens must contain only printable ASCII characters with no whitespace and must not exceed 8 KiB. You can also use a credential file readable only by the account running the service:
 
 ```sh
-chmod 600 /安全目录/remote-mcp.token
-./bin/remote-mcp --token-file /安全目录/remote-mcp.token --listen 192.168.1.10:8080
+chmod 600 /secure/remote-mcp.token
+./bin/remote-mcp --token-file /secure/remote-mcp.token --listen 192.168.1.10:8080
 ```
 
-Token 文件优先于环境变量，读取时去除文件首尾空白；显式指定的文件为空、不可读、格式或权限无效时启动失败，不会退回匿名模式。非空但非法的环境 Token 也会报错。Windows 的 Token 文件请通过文件 ACL 限制为运行账号可读；程序无法用 Unix 权限位代替 Windows ACL 检查。服务不接受 Token 命令行值，避免凭据出现在进程参数中。
+The token file takes precedence over the environment variable; leading and trailing whitespace is trimmed when reading it. If an explicitly specified file is empty, unreadable, or has invalid contents or permissions, startup fails instead of falling back to anonymous access. A nonempty but invalid environment token also causes an error. On Windows, restrict token file access to the service account using file ACLs; Unix permission bits cannot substitute for Windows ACL checks. The service does not accept token values as command-line arguments, keeping credentials out of process arguments.
 
-默认监听所有 IPv4 接口的 `0.0.0.0:8080`。限制为本机可用 `--listen 127.0.0.1:8080`；IPv6 使用 `--listen '[::]:8080'`，仅监听 IPv6，不假定系统支持双栈。端口 `0` 由系统分配，启动配置展示实际端口。停止时使用 Ctrl+C 或正常终止信号，服务清理受管理的进程、终端、传输临时文件及句柄；强杀进程或断电无法保证临时文件清理。
+By default, the server listens on all IPv4 interfaces at `0.0.0.0:8080`. Use `--listen 127.0.0.1:8080` for local access only. For IPv6, use `--listen '[::]:8080'`; this listens only on IPv6 and does not assume dual-stack support. Port `0` lets the operating system assign a port, and the startup configuration shows the actual port. Stop the service with Ctrl+C or a normal termination signal to clean up managed processes, terminals, temporary transfer files, and handles. Temporary file cleanup cannot be guaranteed after a forced kill or power loss.
 
-## 复制启动配置
+## Copy the startup configuration
 
-监听成功后，stdout 为每个启用网卡上的可用 IP 输出一份完整的 OpenCode 配置。同一网卡上的多个地址也分别展示，重复地址会去重并稳定排序。未配置 Token 时例如：
+Once the listener is ready, stdout prints a complete OpenCode configuration for each usable IP address on enabled network interfaces. Multiple addresses on the same interface are shown separately, with duplicates removed and a stable sort order. Without a token, an example configuration is:
 
 ```json
 {
@@ -68,107 +70,107 @@ Token 文件优先于环境变量，读取时去除文件首尾空白；显式�
 }
 ```
 
-存在 VPN 地址时还会输出它的独立配置。**选择 Agent 可达的一份配置使用**；这些地址属于同一个服务。每段都是独立 JSON 对象，多段合在一起不是单个 JSON 文档。匿名模式完全省略 `headers`；启用鉴权后，配置会增加 `"headers": {"Authorization": "Bearer <当前 Token>"}`，其中包含真实 Token，请将其视为凭据保管。中文说明和普通日志写入 stderr，普通日志不记录 Token、环境变量值、文件内容或终端输入输出。
+VPN addresses receive separate configurations when available. **Choose a configuration reachable from your agent**; all listed addresses belong to the same service. Each block is a separate JSON object; concatenating them does not produce a single JSON document. Anonymous mode omits `headers` entirely. With authentication enabled, the configuration adds `"headers": {"Authorization": "Bearer <current token>"}` containing the actual token, so treat it as a credential. Explanatory messages in Chinese and regular logs go to stderr. Regular logs do not record tokens, environment variable values, file contents, or terminal input/output.
 
-全接口展示会排除停用网卡、回环、未指定地址、组播和 IPv6 链路本地地址。单 IP 绑定只显示该地址；显式回环绑定说明仅限本机。网卡枚举失败时服务继续运行并提示手动配置，不输出 `0.0.0.0` 或 `::` 作为连接 URL。列出网卡地址不意味着 Agent 侧路由、防火墙或证书信任已就绪。
+When listening on all interfaces, the address list excludes disabled interfaces, loopback, unspecified, multicast, and IPv6 link-local addresses. Binding to a single IP shows only that address; an explicit loopback binding is labeled as local-only. If interface enumeration fails, the service keeps running and prompts you to configure the client manually, without using `0.0.0.0` or `::` as a connection URL. Listing an interface address does not establish routing, firewall access, or certificate trust on the agent side.
 
-配置采用 [OpenCode 远程 MCP 格式](https://opencode.ai/docs/mcp-servers/#remote)：顶层为 `mcp`，服务类型为 `remote`，`enabled: true` 启用连接，`oauth: false` 关闭本服务不提供的 OAuth 流程。选择一段 JSON 合并到项目或用户的 `opencode.json`，已有配置只合并对应的 `mcp.remote-mcp` 条目，保留其他设置；重启 OpenCode 后使用 `opencode mcp list` 查看状态。此格式与 OpenCode 1.18.34 对应，不是 MCP 协议规定的统一配置文件；其他客户端须将相同 URL 及可选 Authorization 值转换成其配置格式。客户端须支持 Streamable HTTP 和协议版本 **2025-11-25**；启用鉴权时还需支持 Bearer Token；不提供 stdio、旧 SSE 或 OAuth 自动发现适配，也不表示已验证所有品牌 Agent。
+The configuration uses the [OpenCode remote MCP format](https://opencode.ai/docs/mcp-servers/#remote): `mcp` is the top-level key, the server type is `remote`, `enabled: true` enables the connection, and `oauth: false` disables the OAuth flow that this service does not provide. Merge one JSON block into your project or user `opencode.json`. For an existing configuration, merge only the `mcp.remote-mcp` entry and preserve other settings. Restart OpenCode, then use `opencode mcp list` to check the status. This format corresponds to OpenCode 1.18.34; it is not a universal configuration file defined by the MCP protocol. Other clients must map the same URL and optional Authorization value to their own configuration format. Clients must support Streamable HTTP and protocol version **2025-11-25**, plus Bearer tokens when authentication is enabled. The service provides no adapters for stdio, legacy SSE, or OAuth autodiscovery, and compatibility with every agent product has not been verified.
 
-## 鉴权与 HTTPS
+## Authentication and HTTPS
 
-未配置 Token 时不校验 Authorization。配置非空 Token 后，每个 MCP 请求均校验凭据，缺失或错误返回 HTTP 401，协议会话 ID 不替代鉴权。允许访问的客户端共享运行账号的文件及命令权限；工作目录不是沙箱，程序不自动提权。进程树回收针对受管理的进程组、终端作业和 Windows Job Object；程序主动脱离 Unix 会话等行为可能无法完整回收，不构成恶意程序隔离。建议用符合调试需要的专用账号启动。
+Without a configured token, Authorization is not checked. With a nonempty token configured, every MCP request is authenticated; missing or incorrect credentials return HTTP 401. A protocol session ID does not replace authentication. Authorized clients share the file and command permissions of the service account. The working directory is not a sandbox, and the program does not elevate privileges automatically. Process tree cleanup covers managed process groups, terminal jobs, and Windows Job Objects. Programs that deliberately detach from Unix sessions, for example, may not be fully cleaned up; this is not isolation for malicious programs. Use a dedicated account with the permissions needed for debugging.
 
-加密 VPN 可承载 HTTP；普通内网可配置 HTTPS：
+An encrypted VPN can carry HTTP traffic. On a regular local network, you can configure HTTPS:
 
 ```sh
-./bin/remote-mcp --tls-cert /证书/server.pem --tls-key /证书/server.key
+./bin/remote-mcp --tls-cert /certs/server.pem --tls-key /certs/server.key
 ```
 
-证书必须覆盖所选 IP 或客户端手动配置的域名。启动配置会改为 `https://`；客户端仍须验证证书。辅助命令支持 `--ca-file /证书/ca.pem` 添加自签 CA，不提供跳过证书校验选项。
+The certificate must cover the selected IP address or the domain name manually configured by the client. Startup configurations then use `https://`; clients must still verify the certificate. The transfer helper supports `--ca-file /certs/ca.pem` to add a self-signed CA and provides no option to skip certificate verification.
 
-不含 `Origin` 的非浏览器请求可访问。有 `Origin` 的请求默认拒绝；确有需要时设置精确允许列表：
+Non-browser requests without an `Origin` header are allowed. Requests with an `Origin` header are rejected by default. If needed, configure an exact allowlist:
 
 ```sh
 ./bin/remote-mcp --allowed-origins https://agent.example,https://console.example
 ```
 
-该选项不是免鉴权通道，也不自动配置浏览器 CORS 预检策略。防火墙应允许 Agent 所在内网或 VPN 访问监听端口。
+This option does not bypass authentication or automatically configure a browser CORS preflight policy. The firewall should allow the agent's local network or VPN to reach the listening port.
 
-## 上传和下载文件
+## Upload and download files
 
-辅助命令在 Agent 所在机器上运行，从本地磁盘读取真实字节，经 MCP 分块传输，文件内容不经过模型复述。
+The helper runs on the agent's machine, reads actual bytes from local disk, and transfers them in chunks over MCP. File contents do not pass through model-generated text.
 
 ```sh
-./bin/remote-mcp-transfer upload --url http://192.168.1.10:8080/mcp ./程序包.zip /客户机目录/程序包.zip
-./bin/remote-mcp-transfer download --url http://192.168.1.10:8080/mcp /客户机目录/运行日志.txt ./运行日志.txt
+./bin/remote-mcp-transfer upload --url http://192.168.1.10:8080/mcp ./package.zip /remote-dir/package.zip
+./bin/remote-mcp-transfer download --url http://192.168.1.10:8080/mcp /remote-dir/runtime.log ./runtime.log
 ```
 
-默认不需要 Token，辅助命令不发送 Authorization。若服务端已启用鉴权，先设置相同的 `REMOTE_MCP_TOKEN`，或传入 `--token-file`；显式无效文件会报错。`--url` 可由 `REMOTE_MCP_URL` 提供。选项放在 `upload` 或 `download` 后、两个路径参数前。使用 `--overwrite` 才允许替换已有目标；上传和下载先写临时文件，大小和 SHA-256 校验通过后提交。失败返回非零退出码，进度写 stderr，最终 JSON 摘要写 stdout，包含 `ok`、`size`、`sha256` 或错误原因。
+By default, no token is required and the helper sends no Authorization header. If the server has authentication enabled, set the same `REMOTE_MCP_TOKEN` first or pass `--token-file`; an explicitly specified invalid file causes an error. `REMOTE_MCP_URL` can supply `--url`. Place options after `upload` or `download` and before the two path arguments. Existing destinations are replaced only with `--overwrite`. Uploads and downloads write to temporary files first and commit only after size and SHA-256 verification. Failures return a nonzero exit code. Progress goes to stderr, and the final JSON summary goes to stdout with `ok`, `size`, `sha256`, or an error reason.
 
-单文件默认 4 GiB、原始分块默认 256 KiB。目录请先用系统工具打包，压缩包按普通文件传输；服务不自动解包、不保留文件权限或原始时间戳、不支持目录同步和用户级断点续传。Unix 可执行文件上传后需用命令工具设置执行位，或用解释器运行上传的脚本。
+The default maximum file size is 4 GiB, and the default raw chunk size is 256 KiB. Package directories with system tools first; archives are transferred as ordinary files. The service does not automatically extract archives, preserve file permissions or original timestamps, synchronize directories, or support user-initiated transfer resumption. After uploading a Unix executable, use the command tool to set its executable bit, or run an uploaded script through an interpreter.
 
-## MCP 工具
+## MCP tools
 
-客户端通过 `tools/list` 获得完整的类型化参数。业务失败返回 MCP `isError` 和稳定错误码；不要把协议 HTTP 200 当作工具成功。
+Clients can obtain the complete typed parameters through `tools/list`. Operation failures return MCP `isError` and stable error codes; an HTTP 200 protocol response does not imply tool success.
 
-| 工具 | 用途 |
+| Tool | Purpose |
 | --- | --- |
-| `file_stat` | 查询路径信息 |
-| `upload_create` / `upload_write` / `upload_finish` / `upload_cancel` | 创建、顺序分块写入、校验提交及取消上传 |
-| `download_open` / `download_read` / `download_close` | 打开、按字节偏移分块读取及关闭下载 |
-| `process_start` / `process_read` / `process_status` / `process_stop` | 执行、读取输出、查询及停止进程树 |
-| `terminal_open` / `terminal_write` / `terminal_read` | 创建真实终端、输入和读取合并输出 |
-| `terminal_resize` / `terminal_status` / `terminal_close` | 调整尺寸、查询及关闭终端 |
+| `file_stat` | Inspect path information |
+| `upload_create` / `upload_write` / `upload_finish` / `upload_cancel` | Create an upload, write sequential chunks, verify and commit, or cancel |
+| `download_open` / `download_read` / `download_close` | Open a download, read chunks by byte offset, and close it |
+| `process_start` / `process_read` / `process_status` / `process_stop` | Run a process, read output, query status, and stop its process tree |
+| `terminal_open` / `terminal_write` / `terminal_read` | Create a real terminal, send input, and read combined output |
+| `terminal_resize` / `terminal_status` / `terminal_close` | Resize, inspect, and close a terminal |
 
-创建上传、进程和终端必须传入调用方生成的 `request_id`。同一 ID 和相同参数在记录保留期内返回已有资源，参数变化则报冲突。跨 MCP 连接仍可用应用资源 ID 操作同一服务的资源；启用鉴权时仍须通过 Token 校验。网络断开不自动结束后台进程或终端，服务重启不会恢复它们。
+Creating uploads, processes, and terminals requires a caller-generated `request_id`. Reusing the same ID with identical parameters returns the existing resource during the record retention period; changed parameters cause a conflict. Application resource IDs can access resources on the same service across MCP connections; token authentication is still required when enabled. Network disconnections do not automatically stop background processes or terminals, and restarting the service does not restore them.
 
-### 普通命令和后台进程
+### Commands and background processes
 
-`process_start` 示例参数：
+Example parameters for `process_start`:
 
 ```json
 {
   "request_id": "debug-build-001",
   "command": "go",
   "args": ["test", "./..."],
-  "dir": "/客户机工程",
+  "dir": "/remote-project",
   "env": {"CGO_ENABLED": "0"},
   "wait_ms": 10000
 }
 ```
 
-返回资源 ID 和状态。`wait_ms` 最多 10000 毫秒，超出等待窗口继续通过 ID 读取。普通命令默认 5 分钟超时；`background: true` 且 `timeout_ms: 0` 可运行无期限后台服务。只有显式调用 shell 才解释管道和重定向，例如 Unix 的 `sh -c` 或 Windows 的 `powershell.exe -NoProfile -Command`。
+The response includes a resource ID and status. `wait_ms` is limited to 10000 milliseconds; use the ID to continue reading after the wait window. Commands time out after 5 minutes by default. Set `background: true` and `timeout_ms: 0` to run a background service indefinitely. Pipes and redirection are interpreted only when you explicitly invoke a shell, such as `sh -c` on Unix or `powershell.exe -NoProfile -Command` on Windows.
 
-`process_read` 参数为 `id`、`stream`（`stdout` 或 `stderr`）、`cursor`（初始为 0）和可选 `limit`。下一次用返回的 `next_cursor` 继续。`start_cursor`、`end_cursor`、`truncated` 明确说明有界缓冲是否淘汰旧内容；`data_base64` 保存原始字节，`text` 是 UTF-8 视图，`valid_utf8` 指示是否合法。Windows 非 UTF-8 程序输出应从 Base64 还原并按程序实际编码解码。
+`process_read` accepts `id`, `stream` (`stdout` or `stderr`), `cursor` (initially 0), and an optional `limit`. Continue with the returned `next_cursor`. The `start_cursor`, `end_cursor`, and `truncated` fields indicate whether the bounded buffer has discarded older output. `data_base64` contains the raw bytes, `text` provides a UTF-8 view, and `valid_utf8` indicates whether the bytes are valid UTF-8. For non-UTF-8 Windows program output, restore the bytes from Base64 and decode them using the program's actual encoding.
 
-### 交互终端
+### Interactive terminals
 
 ```json
 {"request_id":"debug-terminal-001","columns":120,"rows":30}
 ```
 
-调用 `terminal_open` 后，后续 `terminal_write` 使用 `id` 和 Base64 字段 `data_base64`。例如 Unix `pwd` 加回车为 `cHdkDQ==`；Ctrl+C 为 `Aw==`。`terminal_read` 使用 `id`、`cursor` 和可选 `limit`；终端输出为合并流，保留 ANSI/VT 控制序列，没有独立 stderr。通过同一 ID 多次输入可保留目录、环境变量及前台应用状态。
+After calling `terminal_open`, use `id` and the Base64 field `data_base64` in subsequent `terminal_write` calls. For example, Unix `pwd` followed by a carriage return is `cHdkDQ==`; Ctrl+C is `Aw==`. `terminal_read` accepts `id`, `cursor`, and an optional `limit`. Terminal output is a combined stream that preserves ANSI/VT control sequences, with no separate stderr. Repeated input through the same ID preserves the working directory, environment variables, and foreground application state.
 
-`terminal_resize` 接受 `id`、`columns` 和 `rows`。Ctrl+C 输入由前台程序自行响应，强制回收使用 `terminal_close`。Windows 使用 ConPTY，Linux/macOS 使用 PTY。终端默认无调用活动 30 分钟回收，持续输出不会延长这一时间；网络短暂断开后可凭原 ID 继续。
+`terminal_resize` accepts `id`, `columns`, and `rows`. The foreground program handles Ctrl+C input itself; use `terminal_close` for forced cleanup. Windows uses ConPTY, while Linux/macOS use PTY. By default, terminals are reclaimed after 30 minutes without API call activity; continuous output does not extend this period. After a brief network disconnection, use the original ID to continue.
 
-### 一个完整调试流程
+### A complete debugging workflow
 
-1. 在 Agent 机器上用辅助命令上传构建产物；Windows 使用客户机本地路径，例如 `C:\调试\app.exe`。
-2. Unix 原生二进制先调用 `process_start`，参数 `command: "chmod"`、`args: ["u+x", "/客户机目录/app"]`，等待成功退出。脚本也可直接由 `sh`、`python` 等解释器运行。
-3. 调用 `process_start` 运行客户机程序，或 `terminal_open` 创建终端后发送命令；读取日志并根据输出继续输入或调整程序。
-4. 用 `process_status` 确认退出结果，或显式停止后台进程/关闭终端。
-5. 用辅助命令下载日志、转储或构建产物，核对最终 JSON 的大小与 SHA-256。
+1. Use the helper on the agent's machine to upload build artifacts. On Windows, use a path local to the remote machine, such as `C:\debug\app.exe`.
+2. For a native Unix binary, first call `process_start` with `command: "chmod"` and `args: ["u+x", "/remote-dir/app"]`, then wait for a successful exit. Scripts can also run directly through interpreters such as `sh` or `python`.
+3. Call `process_start` to run the remote program, or create a terminal with `terminal_open` and send commands. Read logs and use the output to guide further input or program changes.
+4. Confirm the exit result with `process_status`, or explicitly stop background processes and close terminals.
+5. Use the helper to download logs, dumps, or build artifacts, and verify the size and SHA-256 in the final JSON summary.
 
-## 可调整的默认限制
+## Configurable default limits
 
-运行 `remote-mcp --help` 查看所有参数。大小单位均为字节，时间使用 Go 时间格式（如 `30s`、`5m`）。
+Run `remote-mcp --help` for all options. Sizes are in bytes, and durations use Go duration syntax, such as `30s` or `5m`.
 
-| 参数 | 默认值 |
+| Option | Default |
 | --- | --- |
 | `--listen` | `0.0.0.0:8080` |
-| `--max-body-bytes` | 1048576（1 MiB） |
-| `--max-file-bytes` | 4294967296（4 GiB） |
-| `--chunk-bytes` | 262144（256 KiB） |
+| `--max-body-bytes` | 1048576 (1 MiB) |
+| `--max-file-bytes` | 4294967296 (4 GiB) |
+| `--chunk-bytes` | 262144 (256 KiB) |
 | `--max-transfers` / `--transfer-idle` | 8 / 10m |
 | `--transfer-retention` / `--max-transfer-records` | 10m / 1024 |
 | `--command-timeout` / `--process-retention` | 5m / 10m |
@@ -176,9 +178,9 @@ Token 文件优先于环境变量，读取时去除文件首尾空白；显式�
 | `--terminal-idle` / `--sweep-interval` | 30m / 30s |
 | `--output-bytes` / `--read-bytes` | 4194304 / 65536 |
 
-增大分块后，请同步提高请求体上限，至少容纳 Base64 膨胀和 4 KiB 元数据。并发资源达到上限时返回错误，不无限增长。结束资源及去重记录会过期清理；运行中资源的创建记录仍受保护。
+When increasing the chunk size, also raise the request body limit to accommodate at least the Base64 expansion and 4 KiB of metadata. Reaching concurrent resource limits returns an error instead of allowing unbounded growth. Completed resources and deduplication records expire and are cleaned up; creation records for running resources remain protected.
 
-## 验证与平台范围
+## Validation and platform support
 
 ```sh
 go vet ./...
@@ -189,14 +191,14 @@ python3 scripts/smoke.py --bin-dir dist/linux-amd64
 python3 scripts/smoke.py --bin-dir dist/linux-amd64 --no-token
 ```
 
-构建脚本生成 `dist/{linux,darwin,windows}-{amd64,arm64}/`，每种组合含两个程序。GitHub Actions 在 Linux、Windows、macOS 执行原生测试及竞态检查，并运行真实二进制上传、执行、下载闭环，另运行六组合构建；本地没有执行过的 CI 不能算验证通过。
+The build script generates `dist/{linux,darwin,windows}-{amd64,arm64}/`, with both programs in each combination. GitHub Actions runs native tests and race checks on Linux, Windows, and macOS, exercises an upload/run/download cycle with real binaries, and builds all six combinations. CI runs that have not actually been executed cannot be counted as passed local validation.
 
-Linux 还需安装提供 `/bin/ps` 的 `procps`（或发行版对应包），用于识别并回收终端额外作业组。
+Linux also requires `procps` (or the distribution's equivalent package), which provides `/bin/ps`, to identify and clean up additional terminal job groups.
 
-目标系统下限为 Windows 10 1809+/Server 2019+、macOS 13+、Linux 3.2+ 且具有 PTY。下限来自 Go 1.27 和 ConPTY 的要求，不表示每个旧系统版本均已测试。
+The minimum target systems are Windows 10 1809+/Server 2019+, macOS 13+, and Linux 3.2+ with PTY support. These minimums come from Go 1.27 and ConPTY requirements and do not mean every older OS version has been tested.
 
-当前开发环境为 Linux/amd64。Windows/macOS 的原生终端、文件替换及进程树清理仍须在实际系统运行测试；交叉编译只证明可构建。没有前端、公网中转、多租户隔离、专用断点调试协议或自动安装系统服务功能。
+The current development environment is Linux/amd64. Native terminal behavior, file replacement, and process tree cleanup on Windows/macOS still require tests on those systems; cross-compilation only demonstrates that the programs build. The project does not include a frontend, public relay, multi-tenant isolation, a dedicated breakpoint debugging protocol, or automatic system service installation.
 
-Windows CI 曾发现宿主标准输入输出重定向导致 ConPTY 会话误用宿主句柄的问题，现已修正启动参数，并增加管道及文件重定向宿主下的交互、Ctrl+C 和空闲回收回归测试；修复后的 Windows 原生结果仍需 CI 确认。
+Windows CI previously exposed a problem where redirected host standard input/output caused ConPTY sessions to use host handles incorrectly. The startup parameters have been fixed, with regression tests added for interaction, Ctrl+C, and idle cleanup when the host uses pipe or file redirection. The Windows native results after the fix still need CI confirmation.
 
-本次 Linux/amd64 验证已通过：竞态测试、静态检查、真实二进制上传/执行/下载闭环，以及 257 MiB 实际 MCP 双向传输。该大文件测试约 29.74 秒，采样峰值堆增量约 9.46 MiB，两端 SHA-256 一致；采样堆增量不等同于操作系统 RSS。
+The recorded Linux/amd64 validation passed race tests, static analysis, an upload/run/download cycle with real binaries, and an actual 257 MiB bidirectional MCP transfer. The large-file test took approximately 29.74 seconds, with a sampled peak heap increase of about 9.46 MiB and matching SHA-256 hashes at both ends. A sampled heap increase is not equivalent to operating system RSS.
