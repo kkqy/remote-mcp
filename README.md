@@ -4,8 +4,6 @@
 
 A Go MCP service deployed on a remote machine. Agents connect over a local network or VPN to transfer files, run commands, and operate real interactive terminals. The service includes two programs: the `remote-mcp` server and the `remote-mcp-transfer` local file transfer helper.
 
-程序自有错误、提示、CLI 帮助和 MCP 工具/参数说明使用英文；文档和源码注释继续使用中文。用户文件、终端输出及 GUI 输入保持原有字节或文本，支持中文。
-
 ## Build and start
 
 The module requires Go 1.25 or later and builds with Go 1.27 by default. CGO is not required:
