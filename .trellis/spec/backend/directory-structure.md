@@ -6,6 +6,9 @@
 - `internal/server/`：HTTP/MCP 接入、鉴权、Origin 校验、监听、启动配置输出和服务关闭。
 - `internal/transfer/`：分块传输状态机、校验、临时文件发布、文件工具及平台提交操作。
 - `internal/execution/`：普通进程、交互终端、输出缓冲、生命周期及 Unix/Windows 系统适配。
+- `internal/fileops/`：有界目录浏览、UTF-8 行读取、字面文本搜索和 SHA-256 前提的行补丁。
+- `internal/logstream/`：普通日志文件代际、追加等待、轮转截断和空闲句柄回收。
+- `internal/inspection/`：系统/运行时、进程树、TCP 监听 PID 和有界分阶段网络探测。
 - `internal/forwarding/`：TCP 转发监听、双向流量复制、连接限额及规则生命周期。
 - `internal/gui/`：当前用户图形会话、截图坐标记录、输入串行、平台能力与授权及资源清理。
 - `scripts/build.sh`：六种系统/架构组合的两个程序构建。

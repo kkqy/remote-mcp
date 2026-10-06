@@ -10,6 +10,7 @@
 4. 涉及资源生命周期时，阅读 [状态存储](database-guidelines.md)。
 5. 涉及 TCP 转发时，阅读 [端口转发契约](port-forwarding.md)。
 6. 涉及桌面截图、键鼠或中文输入时，阅读 [GUI 契约](gui.md)。
+7. 涉及系统巡检、等待读取、日志跟踪或文本文件补丁时，阅读 [远程调试 P0 契约](remote-debug.md)。
 
 ## 质量检查
 
