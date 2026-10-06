@@ -21,6 +21,7 @@ import (
 	"remote-mcp/internal/config"
 	"remote-mcp/internal/execution"
 	"remote-mcp/internal/forwarding"
+	"remote-mcp/internal/gui"
 	"remote-mcp/internal/transfer"
 )
 
@@ -33,6 +34,7 @@ type App struct {
 	files      *transfer.Manager
 	execution  *execution.Manager
 	forwarding *forwarding.Manager
+	gui        *gui.Manager
 	closing    atomic.Bool
 	once       sync.Once
 	closeErr   error
@@ -58,13 +60,21 @@ func New(c config.Config, diagnostics io.Writer) (*App, error) {
 		files.Close()
 		return nil, fmt.Errorf("转发配置无效: %w", err)
 	}
-	app := &App{config: c, files: files, execution: processes, forwarding: forwards}
+	graphics, err := gui.New(c.GUI)
+	if err != nil {
+		forwards.Close()
+		processes.Close()
+		files.Close()
+		return nil, fmt.Errorf("图形操作配置无效: %w", err)
+	}
+	app := &App{config: c, files: files, execution: processes, forwarding: forwards, gui: graphics}
 	// SDK 调试日志可能携带远端参数，运行日志只使用下方固定元数据。
 	silent := slog.New(slog.NewTextHandler(io.Discard, nil))
 	app.MCP = mcp.NewServer(&mcp.Implementation{Name: "remote-mcp", Version: "0.1.0"}, &mcp.ServerOptions{SupportedProtocolVersions: []string{ProtocolVersion}, Logger: silent})
 	files.Register(app.MCP)
 	processes.Register(app.MCP)
 	forwards.Register(app.MCP)
+	graphics.Register(app.MCP)
 	logger := slog.New(slog.NewTextHandler(diagnostics, nil))
 	app.MCP.AddReceivingMiddleware(func(next mcp.MethodHandler) mcp.MethodHandler {
 		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
@@ -130,7 +140,7 @@ func New(c config.Config, diagnostics io.Writer) (*App, error) {
 func (a *App) Close() error {
 	a.once.Do(func() {
 		a.closing.Store(true)
-		a.closeErr = errors.Join(a.forwarding.Close(), a.execution.Close(), a.files.Close())
+		a.closeErr = errors.Join(a.gui.Close(), a.forwarding.Close(), a.execution.Close(), a.files.Close())
 		for session := range a.MCP.Sessions() {
 			a.closeErr = errors.Join(a.closeErr, session.Close())
 		}

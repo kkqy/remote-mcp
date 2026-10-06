@@ -9,6 +9,7 @@
 3. 涉及错误或输出时，阅读 [错误处理](error-handling.md) 和 [日志规则](logging-guidelines.md)。
 4. 涉及资源生命周期时，阅读 [状态存储](database-guidelines.md)。
 5. 涉及 TCP 转发时，阅读 [端口转发契约](port-forwarding.md)。
+6. 涉及桌面截图、键鼠或中文输入时，阅读 [GUI 契约](gui.md)。
 
 ## 质量检查
 
@@ -16,4 +17,4 @@
 
 ## 规范来源
 
-规范来自 `internal/config`、`internal/server`、`internal/transfer`、`internal/execution` 及两个命令入口的实际实现。公共行为以任务验收和测试为准，不能把初始化模板或计划中的能力写成已验证事实。
+规范来自 `internal/config`、`internal/server`、`internal/transfer`、`internal/execution`、`internal/forwarding`、`internal/gui` 及两个命令入口的实际实现。公共行为以任务验收和测试为准，不能把初始化模板或计划中的能力写成已验证事实。

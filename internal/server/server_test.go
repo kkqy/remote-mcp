@@ -329,8 +329,18 @@ func TestAnonymousRunAndProtocol(t *testing.T) {
 		t.Fatal(response.StatusCode)
 	}
 	_, body = rpcWithToken(t, client, entry.URL, session, `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`, "")
-	if len(body["result"].(map[string]any)["tools"].([]any)) != 22 {
+	tools := body["result"].(map[string]any)["tools"].([]any)
+	if len(tools) != 29 {
 		t.Fatal("匿名工具发现失败")
+	}
+	names := make(map[string]bool, len(tools))
+	for _, item := range tools {
+		names[item.(map[string]any)["name"].(string)] = true
+	}
+	for _, name := range []string{"file_stat", "process_start", "terminal_open", "port_forward_create", "gui_status", "gui_open", "gui_close", "gui_screenshot", "gui_mouse", "gui_key", "gui_text"} {
+		if !names[name] {
+			t.Fatal("匿名工具发现缺少工具", name)
+		}
 	}
 	file := filepath.Join(t.TempDir(), "example.txt")
 	if err := os.WriteFile(file, []byte("匿名调用"), 0600); err != nil {

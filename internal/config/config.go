@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"remote-mcp/internal/execution"
 	"remote-mcp/internal/forwarding"
+	"remote-mcp/internal/gui"
 	"remote-mcp/internal/transfer"
 	"strings"
 )
@@ -24,10 +25,11 @@ type Config struct {
 	Transfer       transfer.Config
 	Execution      execution.Config
 	Forwarding     forwarding.Config
+	GUI            gui.Config
 }
 
 func Default() Config {
-	return Config{Listen: "0.0.0.0:8080", MaxBodyBytes: 1 << 20, Transfer: transfer.DefaultConfig(), Execution: execution.DefaultConfig(), Forwarding: forwarding.DefaultConfig()}
+	return Config{Listen: "0.0.0.0:8080", MaxBodyBytes: 1 << 20, Transfer: transfer.DefaultConfig(), Execution: execution.DefaultConfig(), Forwarding: forwarding.DefaultConfig(), GUI: gui.DefaultConfig()}
 }
 
 func Parse(args []string, stderr io.Writer) (Config, error) {
@@ -62,6 +64,11 @@ func Parse(args []string, stderr io.Writer) (Config, error) {
 	fs.DurationVar(&c.Forwarding.DialTimeout, "forward-dial-timeout", c.Forwarding.DialTimeout, "TCP 转发目标连接超时")
 	fs.DurationVar(&c.Forwarding.Retention, "forward-retention", c.Forwarding.Retention, "TCP 转发终态保留时间")
 	fs.DurationVar(&c.Forwarding.SweepInterval, "forward-sweep-interval", c.Forwarding.SweepInterval, "TCP 转发记录清理间隔")
+	fs.DurationVar(&c.GUI.IdleTimeout, "gui-idle", c.GUI.IdleTimeout, "图形会话无调用活动回收时间")
+	fs.DurationVar(&c.GUI.AuthorizationTimeout, "gui-authorize-timeout", c.GUI.AuthorizationTimeout, "图形桌面授权总等待期限")
+	fs.DurationVar(&c.GUI.OperationTimeout, "gui-operation-timeout", c.GUI.OperationTimeout, "截图和输入单次操作等待期限")
+	fs.IntVar(&c.GUI.MaxPixels, "gui-max-pixels", c.GUI.MaxPixels, "原始显示器截图最大像素数")
+	fs.IntVar(&c.GUI.MaxPNGBytes, "gui-max-png-bytes", c.GUI.MaxPNGBytes, "单张 PNG 截图最大字节数")
 	fs.Usage = func() {
 		fmt.Fprintln(stderr, "用法：remote-mcp [选项]；启动后每个 IP 输出一份备选 MCP JSON。")
 		fs.SetOutput(stderr)
@@ -123,5 +130,8 @@ func (c Config) Validate() error {
 			return errors.New("Origin 须为不含路径的 http(s) 源地址")
 		}
 	}
-	return c.Forwarding.Validate()
+	if err := c.Forwarding.Validate(); err != nil {
+		return err
+	}
+	return c.GUI.Validate()
 }

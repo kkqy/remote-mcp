@@ -7,8 +7,10 @@
 - `internal/transfer/`：分块传输状态机、校验、临时文件发布、文件工具及平台提交操作。
 - `internal/execution/`：普通进程、交互终端、输出缓冲、生命周期及 Unix/Windows 系统适配。
 - `internal/forwarding/`：TCP 转发监听、双向流量复制、连接限额及规则生命周期。
+- `internal/gui/`：当前用户图形会话、截图坐标记录、输入串行、平台能力与授权及资源清理。
 - `scripts/build.sh`：六种系统/架构组合的两个程序构建。
 - `scripts/smoke.py`：使用实际二进制完成上传、独立协议调用、执行和下载校验。
+- `scripts/gui-smoke.py` 与 `scripts/gui_fixture.py`：独立 GUI 协议验证及显式启用的专用原生测试窗口。
 - `.github/workflows/check.yml`：跨平台检查配置；配置存在不代表远端已经执行成功。
 
 测试与所属代码放在同一包的 `_test.go` 文件。系统差异由 `_windows.go` 及带构建约束的 Unix 文件隔离。共享 `go.mod/go.sum` 的写入必须协调，不允许并行代理覆盖依赖。

@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "管理器约定与平台后端隔离"}
+{"file": ".trellis/spec/backend/mcp-contracts.md", "reason": "MCP 图片、工具、鉴权与会话契约"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "图形会话与输入占用的资源生命周期"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "中文错误、稳定错误码与工具失败"}
+{"file": ".trellis/spec/backend/logging-guidelines.md", "reason": "禁止日志记录截图、输入与授权凭据"}
+{"file": ".trellis/tasks/10-06-gui-control-screenshot/research/platform-boundaries.md", "reason": "跨平台 GUI 能力和无 CGO 构建约束"}
+{"file": ".trellis/tasks/10-06-gui-control-screenshot/research/wayland.md", "reason": "Wayland 授权、桌面支持矩阵、采集、输入及无 CGO 方案"}
