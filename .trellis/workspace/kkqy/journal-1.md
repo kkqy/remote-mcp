@@ -158,3 +158,25 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 6: GitHub Actions 自动编译发布
+<!-- trellis-session: v=2 fp=28099a7efd0913f1 -->
+
+**Date**: 2026-10-07
+**Task**: GitHub Actions 自动编译发布
+**Branch**: `codex/github-actions-release`
+
+### Summary
+
+实现 v* 标签通过 Linux/Windows 原生验证及四组合构建后发布正式 Release，四包两程序附 SHA256SUMS；单次 GraphQL 检查已有版本与查询错误，草稿上传后公开。12 项离线测试、actionlint、真实四组合构建和包字节/权限/哈希核验通过；未实际运行新增远端 Actions 或发布 Release。保留用户 .opencode/package.json 修改。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `23101a2` | feat: 添加 GitHub Actions 自动编译发布 |
+
+### Status
+
+[OK] **Completed**

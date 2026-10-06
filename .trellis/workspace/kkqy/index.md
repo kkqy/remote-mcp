@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 5
+- **Total Sessions**: 6
 - **Last Active**: 2026-10-07
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~160 | Active |
+| `journal-1.md` | ~182 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 6 | 2026-10-07 | GitHub Actions 自动编译发布 | `23101a2` | `codex/github-actions-release` |
 | 5 | 2026-10-07 | GUI 仅保留 Windows 与原生验收收尾 | `2325545f6ee5651fb371733a54236dbc5bfa2f28`, `898e071fd4ab56901a48ae8caf312a090f455e6f` | `codex/gui-native-validation` |
 | 4 | 2026-10-06 | 移除 macOS 并完成 Windows 原生验收 | `d08dc748191f62dbfd644c6c968bac3b18928412`, `22bd07c31a3eab144b3bd431cfae33701dfec10c`, `42aceb4a2f499b9924516af26dbe59467b41f734` | `codex/remote-debug-p0` |
 | 3 | 2026-10-04 | 完成 TCP 端口转发功能 | `7b717f6` | `codex/port-forwarding` |
