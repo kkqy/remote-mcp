@@ -6,7 +6,7 @@
 {"file": ".trellis/spec/backend/gui.md", "reason": "Windows 专用 GUI 契约；Linux 不注册图形工具"}
 {"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "复用原生部署、UTF-8限额与清理后成功报告"}
 {"file": ".trellis/tasks/archive/2026-10/10-06-remote-debug-p0/research/windows-native.md", "reason": "已有Windows原生助手与主入口隔离验证证据"}
-{"file": ".trellis/tasks/10-06-gui-control-screenshot/research/implementation-windows-gui.md", "reason": "已有 Windows 原生助手实现及验收边界"}
-{"file": ".trellis/tasks/10-06-gui-control-screenshot/research/implementation-windows-only-go.md", "reason": "Linux 删除边界和 Go 检查结果"}
-{"file": ".trellis/tasks/10-06-gui-control-screenshot/research/implementation-windows-only-scripts.md", "reason": "Windows 通用协议脚本及 Qt 夹具删除边界"}
-{"file": ".trellis/tasks/10-06-gui-control-screenshot/research/windows-only-scope-2026-10-07.md", "reason": "用户最新 Windows-only 决策及 KDE 清理历史"}
+{"file": ".trellis/tasks/archive/2026-10/10-06-gui-control-screenshot/research/implementation-windows-gui.md", "reason": "已有 Windows 原生助手实现及验收边界"}
+{"file": ".trellis/tasks/archive/2026-10/10-06-gui-control-screenshot/research/implementation-windows-only-go.md", "reason": "Linux 删除边界和 Go 检查结果"}
+{"file": ".trellis/tasks/archive/2026-10/10-06-gui-control-screenshot/research/implementation-windows-only-scripts.md", "reason": "Windows 通用协议脚本及 Qt 夹具删除边界"}
+{"file": ".trellis/tasks/archive/2026-10/10-06-gui-control-screenshot/research/windows-only-scope-2026-10-07.md", "reason": "用户最新 Windows-only 决策及 KDE 清理历史"}
