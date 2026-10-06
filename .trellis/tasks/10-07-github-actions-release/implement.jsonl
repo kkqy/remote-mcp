@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "支持平台和英文输出规则"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "构建验证与临时目录约定"}
+{"file": ".trellis/tasks/10-07-github-actions-release/research/release.md", "reason": "官方发布依据"}
+{"file": ".trellis/spec/backend/release.md", "reason": "正式发布触发、命令、权限与失败契约"}

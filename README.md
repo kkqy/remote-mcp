@@ -4,6 +4,36 @@
 
 A Go MCP service deployed on a remote machine. Agents connect over a local network or VPN to transfer files, run commands, and operate real interactive terminals. The service includes two programs: the `remote-mcp` server and the `remote-mcp-transfer` local file transfer helper.
 
+## 下载与自动发布
+
+可从仓库的 [GitHub Releases](../../releases) 下载正式版本。每个压缩包只含 `remote-mcp` 服务端和 `remote-mcp-transfer` 辅助命令；Windows 文件带 `.exe` 后缀。
+
+| 平台 | 附件名（以 `v1.2.3` 为例） |
+| --- | --- |
+| Linux amd64 | `remote-mcp-v1.2.3-linux-amd64.tar.gz` |
+| Linux arm64 | `remote-mcp-v1.2.3-linux-arm64.tar.gz` |
+| Windows amd64 | `remote-mcp-v1.2.3-windows-amd64.zip` |
+| Windows arm64 | `remote-mcp-v1.2.3-windows-arm64.zip` |
+
+同一版本附带 `SHA256SUMS`，记录四个压缩包的实际 SHA-256。Linux 下载全部附件后可运行 `sha256sum -c SHA256SUMS`，再用 `tar -xzf <压缩包>` 解压；tar 保留两个程序的可执行权限。Windows 解压 zip 后运行 `.exe`，可用 `Get-FileHash <压缩包> -Algorithm SHA256` 对照校验文件。
+
+维护者先将发布工作流和版本代码合入并推送 `main`，再从已合入 `main` 的提交创建并推送标签，例如：
+
+```sh
+git switch main
+git pull --ff-only
+git tag -a v1.2.3 -m "Release v1.2.3"
+git push origin v1.2.3
+```
+
+内置 `GITHUB_TOKEN` 不具备额外的 Workflows 权限；标签目标若包含相对默认分支尚未合入的工作流修改，GitHub 可能拒绝创建 Release。本流程不使用 PAT，请先完成上述合入步骤。
+
+普通分支 push 和 PR 继续验证，不发布版本；仅 `v*` 标签 push 进入发布流程。打包脚本要求标签以 `v` 开头、后续首字符为字母或数字、其余仅含字母/数字/点/下划线/连字符，总长最多 64 字符；其他名称会明确失败。Linux、Windows 原生验证和四组合构建全部成功后，发布 job 才创建草稿、上传四个包和校验文件，全部上传成功后公开为正式 Release。只有该 job 的 `GITHUB_TOKEN` 具有 `contents: write`，相同 ref 的发布串行且不取消正在执行的发布；原有二进制和 P0 验证 artifact 保留。
+
+已有正式 Release 或同标签草稿不会自动覆盖。验证阶段失败时可在 Actions 重跑；若创建草稿或上传中断，先在 Releases 核对本次标签与草稿附件，再手动删除**本次失败草稿**，保留标签并重跑该 Actions run。不要删除已公开版本或使用附件覆盖参数。最终公开请求若超时，结果可能已生效，必须先查看 Release 状态；若已公开则不重跑覆盖，后续修改使用新版本标签。
+
+发布构建不代表 Windows/arm64、多屏/混合 DPI 或 GUI 原生缺口已验收。当前自动发布链路尚未实际创建版本；实际发布需维护者推送选定标签。开发者可用 `python3 scripts/release.py package --tag v1.2.3 --dist-dir dist --output-dir .tmp/release` 本机打包，输出目录须不存在；临时文件与构建缓存均置于项目 `.tmp/`。
+
 ## Build and start
 
 The module requires Go 1.25 or later and builds with Go 1.27 by default. CGO is not required:

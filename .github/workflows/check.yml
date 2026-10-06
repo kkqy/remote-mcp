@@ -13,6 +13,17 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare workspace temporary directories
+        shell: pwsh
+        run: |
+          $base = Join-Path $env:GITHUB_WORKSPACE '.tmp'
+          $directories = @{TMPDIR='temp'; TMP='temp'; TEMP='temp'; GOCACHE='go-cache'; GOTMPDIR='go-tmp'; GOMODCACHE='go-mod-cache'}
+          foreach ($entry in $directories.GetEnumerator()) {
+            $directory = Join-Path $base $entry.Value
+            New-Item -ItemType Directory -Force -Path $directory | Out-Null
+            "$($entry.Key)=$directory" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
+          'PYTHONDONTWRITEBYTECODE=1' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - uses: actions/setup-go@v5
         with:
           go-version: '1.27.x'
@@ -23,6 +34,7 @@ jobs:
         env:
           CGO_ENABLED: '0'
       - run: python -m unittest discover -s scripts -p "test*smoke.py"
+      - run: python scripts/test_release.py
       - run: python scripts/smoke.py --bin-dir bin
       - run: python scripts/smoke.py --bin-dir bin --no-token
       - run: python scripts/p0-smoke.py --bin-dir bin --report-file reports/p0-token.json
@@ -37,6 +49,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare workspace temporary directories
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/.tmp/temp" "$GITHUB_WORKSPACE/.tmp/go-cache" "$GITHUB_WORKSPACE/.tmp/go-tmp" "$GITHUB_WORKSPACE/.tmp/go-mod-cache"
+          for variable in TMPDIR TMP TEMP; do echo "$variable=$GITHUB_WORKSPACE/.tmp/temp" >> "$GITHUB_ENV"; done
+          echo "GOCACHE=$GITHUB_WORKSPACE/.tmp/go-cache" >> "$GITHUB_ENV"
+          echo "GOTMPDIR=$GITHUB_WORKSPACE/.tmp/go-tmp" >> "$GITHUB_ENV"
+          echo "GOMODCACHE=$GITHUB_WORKSPACE/.tmp/go-mod-cache" >> "$GITHUB_ENV"
+          echo 'PYTHONDONTWRITEBYTECODE=1' >> "$GITHUB_ENV"
       - uses: actions/setup-go@v5
         with:
           go-version: '1.27.x'
@@ -46,3 +66,41 @@ jobs:
         with:
           name: remote-mcp-binaries
           path: dist/
+      - name: Package release assets
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python3 scripts/release.py package --tag "$RELEASE_TAG"
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: remote-mcp-release
+          path: .tmp/release/
+          include-hidden-files: true
+          if-no-files-found: error
+  release:
+    needs: [native, cross-build]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: release-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare workspace temporary directory
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/.tmp/temp"
+          for variable in TMPDIR TMP TEMP; do echo "$variable=$GITHUB_WORKSPACE/.tmp/temp" >> "$GITHUB_ENV"; done
+          echo 'PYTHONDONTWRITEBYTECODE=1' >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          name: remote-mcp-release
+          path: .tmp/release/
+      - name: Publish release after all validation jobs succeed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+        run: python3 scripts/release.py publish --tag "$RELEASE_TAG" --repo "$RELEASE_REPOSITORY"

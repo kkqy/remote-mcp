@@ -12,10 +12,11 @@
 - `internal/forwarding/`：TCP 转发监听、双向流量复制、连接限额及规则生命周期。
 - `internal/gui/`：Windows 当前用户图形会话、截图坐标记录、输入串行及资源清理；非 Windows 仅保留构建桩。
 - `scripts/build.sh`：Linux/Windows × amd64/arm64 四种组合的两个程序构建。
+- `scripts/release.py` 与 `scripts/test_release.py`：四组合发布压缩包、SHA-256 校验、草稿上传后公开及离线失败边界验证。
 - `scripts/smoke.py`：使用实际二进制完成上传、独立协议调用、执行和下载校验。
 - `scripts/gui-smoke.py`：从任意 Python 宿主验证远端 Windows GUI 的独立 HTTP/PNG 协议。
 - `scripts/windows-gui-smoke.py` 与 `scripts/native-smoke/gui_*`：显式启用的 Windows 专用原生测试窗口及有界部署验收。
-- `.github/workflows/check.yml`：跨平台检查配置；配置存在不代表远端已经执行成功。
+- `.github/workflows/check.yml`：跨平台检查及受验证依赖约束的标签正式发布；配置存在不代表远端已经执行或实际发布成功。
 
 测试与所属代码放在同一包的 `_test.go` 文件。系统差异由 `_windows.go` 及带构建约束的 Unix 文件隔离。共享 `go.mod/go.sum` 的写入必须协调，不允许并行代理覆盖依赖。
 
