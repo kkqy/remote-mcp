@@ -135,3 +135,26 @@
 ### 后续事项
 
 - Windows arm64 仅构建、Windows race 未原生执行；GUI 原任务保留独立验收缺口，首版与规范引导任务保持原状态。
+
+
+## Session 5: GUI 仅保留 Windows 与原生验收收尾
+<!-- trellis-session: v=2 fp=029e29e49409790e -->
+
+**Date**: 2026-10-07
+**Task**: GUI 仅保留 Windows 与原生验收收尾
+**Branch**: `codex/gui-native-validation`
+
+### Summary
+
+按用户决策取消 Linux 全部 GUI，删除 X11/Wayland/Portal/KScreen 后端、专属依赖与 Qt 验证夹具；Linux 不再公开 GUI 工具或参数，保留命令行和 P0。保留 Windows 七图形工具，同步 README、规范和任务边界。全 Go test/vet/race、四组合双入口及助手构建、49 项 Python 和定向检查通过。最终 Linux 旧功能/P0 Token/匿名四轮及 GUI 删除边界通过；最终 Windows/amd64 当前构建的专用窗口双模式截图坐标、真实鼠标组合键、中文 emoji 和资源清理通过，原主入口保持。Windows/arm64 实机、多屏混合 DPI、布局变化、撤权与客户端图片展示仍未验证。用户确认后提交两批并归档任务，未推送，用户 .opencode/package.json 改动保持不动。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2325545f6ee5651fb371733a54236dbc5bfa2f28` | refactor: 将 GUI 图形操作限定为 Windows |
+| `898e071fd4ab56901a48ae8caf312a090f455e6f` | test: 记录 Windows GUI 验收与 Linux 范围调整 |
+
+### Status
+
+[OK] **Completed**
