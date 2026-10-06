@@ -48,6 +48,7 @@ type ReadInput struct {
 	Stream string `json:"stream,omitempty" jsonschema:"Use stdout or stderr for a process; terminals use terminal"`
 	Cursor int64  `json:"cursor,omitempty" jsonschema:"Absolute cursor in raw bytes"`
 	Limit  int    `json:"limit,omitempty"`
+	WaitMS int    `json:"wait_ms,omitempty" jsonschema:"Wait for output or exit; milliseconds from 0 to 30000, default 0 returns immediately"`
 }
 type WriteInput struct {
 	ID         string `json:"id"`
@@ -79,6 +80,7 @@ type ReadResult struct {
 	Text        string `json:"text"`
 	ValidUTF8   bool   `json:"valid_utf8"`
 	State       string `json:"state"`
+	Reason      string `json:"reason"`
 }
 type WriteResult struct {
 	Written int `json:"written"`

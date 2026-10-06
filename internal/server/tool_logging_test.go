@@ -15,7 +15,10 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"remote-mcp/internal/config"
+	"remote-mcp/internal/fileops"
 	"remote-mcp/internal/gui"
+	"remote-mcp/internal/inspection"
+	"remote-mcp/internal/logstream"
 )
 
 func TestToolFailureLoggingIndependentHTTP(t *testing.T) {
@@ -291,5 +294,72 @@ func TestUnknownToolFallbackDoesNotMatchToken(t *testing.T) {
 	_, envelope := rpcWithToken(t, client, ts.URL+"/mcp", session, `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"not_registered","arguments":{}}}`, c.Token)
 	if envelope["error"] == nil || strings.Contains(logs.String(), c.Token) || !strings.Contains(logs.String(), "tool=[redacted]") || !strings.Contains(logs.String(), "Requested tool is not registered") {
 		t.Fatal("未知工具名称后备与完整Token碰撞时必须隐藏凭据并保留原因")
+	}
+}
+
+func TestP0DiagnosticTypesAndProjectionBoundaries(t *testing.T) {
+	for _, tc := range []struct {
+		domain string
+		err    error
+		code   string
+	}{
+		{"fileops", &fileops.Error{Code: "invalid_patch", Message: "Invalid patch"}, "invalid_patch"},
+		{"logstream", &logstream.Error{Code: "permission_denied", Message: "Permission denied"}, "permission_denied"},
+	} {
+		diagnostic, trusted := businessDiagnostic(tc.domain, nil, tc.err)
+		if !trusted || diagnostic.code != tc.code || diagnostic.message == "" {
+			t.Fatal("新模块typed错误未进入受控诊断", diagnostic)
+		}
+	}
+	for _, tc := range []struct {
+		domain, payload string
+		trusted         bool
+	}{
+		{"inspection", `{"ok":false,"code":"tls_failed","message":"TLS certificate verification failed","stages":[{"stage":"tcp","state":"ok","reason":"private-stage-data"}]}`, true},
+		{"inspection", `{"ok":true,"partial":true,"code":"permission_denied","message":"Private successful result"}`, false},
+		{"inspection", `{"code":"tls_failed","message":"Missing explicit outcome"}`, false},
+		{"inspection", `{"ok":false,"code":"unrecognized","message":"Unknown code"}`, false},
+		{"", `{"ok":false,"code":"tls_failed","message":"Fake third party payload"}`, false},
+		{"inspection", `{"ok":false,"code":"tls_failed","message":"` + strings.Repeat("x", maxBusinessMessageBytes) + `"}`, false},
+	} {
+		diagnostic, trusted := businessDiagnostic(tc.domain, &mcp.CallToolResult{IsError: true, StructuredContent: json.RawMessage(tc.payload)}, nil)
+		if trusted != tc.trusted {
+			t.Fatalf("投影信任范围错误: %q %+v", tc.domain, diagnostic)
+		}
+		if strings.Contains(diagnostic.message, "private-stage-data") {
+			t.Fatal("投影不能扩展到stage内容")
+		}
+	}
+	const secret = "private-p0-input-012345"
+	for _, key := range []string{"query", "target", "expected_sha256", "edits"} {
+		value := any(secret)
+		if key == "edits" {
+			value = []any{map[string]any{"text": secret}}
+		}
+		arguments, _ := json.Marshal(map[string]any{key: value})
+		message := safeDiagnosticMessage("Operation failed: "+secret, arguments, testToken)
+		if strings.Contains(message, secret) || !strings.Contains(message, "Operation failed") {
+			t.Fatal("新输入字段未过滤", key, message)
+		}
+	}
+}
+
+func TestP0LargeInspectionFailureUsesTrustedError(t *testing.T) {
+	p := newP0Protocol(t)
+	const reason = "TLS certificate is not trusted"
+	const secret = "private-stage-data-012345"
+	mcp.AddTool(p.app.MCP, &mcp.Tool{Name: "network_probe"}, func(_ context.Context, _ *mcp.CallToolRequest, _ inspection.ProbeInput) (*mcp.CallToolResult, inspection.ProbeResult, error) {
+		out := inspection.ProbeResult{Result: inspection.Result{OK: false, Code: "tls_failed", Message: reason}, FailedStage: "tls", Stages: []inspection.Stage{{Stage: "tcp", State: "ok"}, {Stage: "tls", State: "failed", Reason: strings.Repeat(secret, 300)}}}
+		result := &mcp.CallToolResult{}
+		result.SetError(&inspection.Error{Code: "tls_failed", Message: reason})
+		return result, out, nil
+	})
+	out, line := p.call("network_probe", map[string]any{"mode": "tls", "target": "private-target-012345:443"}, true)
+	encoded, _ := json.Marshal(out)
+	if len(encoded) <= maxBusinessMessageBytes || out["failed_stage"] != "tls" || len(out["stages"].([]any)) != 2 {
+		t.Fatal("没有覆盖超出Raw投影预算的失败结构")
+	}
+	if !strings.Contains(line, "error_code=tls_failed") || !strings.Contains(line, reason) || strings.Contains(line, secret) || strings.Contains(line, "private-target-012345") {
+		t.Fatal("大型失败未保留可信指针诊断或泄漏响应内容", line)
 	}
 }

@@ -170,3 +170,19 @@ func TestTerminalParentExitReapsOrphanJob(t *testing.T) {
 	awaitExit(t, m, s.ID)
 	assertGone(t, pid)
 }
+
+func TestTerminalDelayedReadContext(t *testing.T) {
+	m := manager(t)
+	s, err := m.OpenTerminal(TerminalInput{RequestID: "terminal-read-wait", Command: "/bin/sh", Args: []string{"-c", "sleep 0.1; printf '稍后终端'; sleep 0.1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := m.ReadContext(context.Background(), ReadInput{ID: s.ID, WaitMS: 5000})
+	if err != nil || out.Reason != "output" || out.Stream != "terminal" || out.Text != "稍后终端" {
+		t.Fatalf("终端等待输出: %+v %v", out, err)
+	}
+	out, err = m.ReadContext(context.Background(), ReadInput{ID: s.ID, Cursor: out.NextCursor, WaitMS: 5000})
+	if err != nil || out.Reason != "exit" || out.State != "exited" {
+		t.Fatalf("终端退出: %+v %v", out, err)
+	}
+}

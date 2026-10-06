@@ -39,6 +39,11 @@ func TestHelperProcess(t *testing.T) {
 			child.Wait()
 		}
 		os.Exit(0)
+	case "delayed-output":
+		time.Sleep(100 * time.Millisecond)
+		fmt.Fprint(os.Stdout, "稍后输出")
+		time.Sleep(100 * time.Millisecond)
+		os.Exit(0)
 	case "sleep":
 		time.Sleep(time.Minute)
 		os.Exit(0)

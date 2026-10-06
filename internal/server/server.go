@@ -20,8 +20,11 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"remote-mcp/internal/config"
 	"remote-mcp/internal/execution"
+	"remote-mcp/internal/fileops"
 	"remote-mcp/internal/forwarding"
 	"remote-mcp/internal/gui"
+	"remote-mcp/internal/inspection"
+	"remote-mcp/internal/logstream"
 	"remote-mcp/internal/transfer"
 )
 
@@ -35,6 +38,9 @@ type App struct {
 	execution  *execution.Manager
 	forwarding *forwarding.Manager
 	gui        *gui.Manager
+	fileops    *fileops.Manager
+	inspection *inspection.Manager
+	logs       *logstream.Manager
 	closing    atomic.Bool
 	once       sync.Once
 	closeErr   error
@@ -67,7 +73,34 @@ func New(c config.Config, diagnostics io.Writer) (*App, error) {
 		files.Close()
 		return nil, fmt.Errorf("Invalid GUI configuration: %w", err)
 	}
-	app := &App{config: c, files: files, execution: processes, forwarding: forwards, gui: graphics}
+	fileTools, err := fileops.New(fileops.DefaultConfig())
+	if err != nil {
+		graphics.Close()
+		forwards.Close()
+		processes.Close()
+		files.Close()
+		return nil, fmt.Errorf("Invalid file operation configuration: %w", err)
+	}
+	inspector, err := inspection.New(inspection.DefaultConfig())
+	if err != nil {
+		fileTools.Close()
+		graphics.Close()
+		forwards.Close()
+		processes.Close()
+		files.Close()
+		return nil, fmt.Errorf("Invalid inspection configuration: %w", err)
+	}
+	logFiles, err := logstream.New(logstream.DefaultConfig())
+	if err != nil {
+		inspector.Close()
+		fileTools.Close()
+		graphics.Close()
+		forwards.Close()
+		processes.Close()
+		files.Close()
+		return nil, fmt.Errorf("Invalid log stream configuration: %w", err)
+	}
+	app := &App{config: c, files: files, execution: processes, forwarding: forwards, gui: graphics, fileops: fileTools, inspection: inspector, logs: logFiles}
 	// SDK 调试日志可能携带远端参数，运行日志只使用下方固定元数据。
 	silent := slog.New(slog.NewTextHandler(io.Discard, nil))
 	app.MCP = mcp.NewServer(&mcp.Implementation{Name: "remote-mcp", Version: "0.1.0"}, &mcp.ServerOptions{SupportedProtocolVersions: []string{ProtocolVersion}, Logger: silent})
@@ -75,6 +108,9 @@ func New(c config.Config, diagnostics io.Writer) (*App, error) {
 	processes.Register(app.MCP)
 	forwards.Register(app.MCP)
 	graphics.Register(app.MCP)
+	fileTools.Register(app.MCP)
+	inspector.Register(app.MCP)
+	logFiles.Register(app.MCP)
 	logger := slog.New(slog.NewTextHandler(diagnostics, nil))
 	app.MCP.AddReceivingMiddleware(func(next mcp.MethodHandler) mcp.MethodHandler {
 		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
@@ -144,7 +180,7 @@ func New(c config.Config, diagnostics io.Writer) (*App, error) {
 func (a *App) Close() error {
 	a.once.Do(func() {
 		a.closing.Store(true)
-		a.closeErr = errors.Join(a.gui.Close(), a.forwarding.Close(), a.execution.Close(), a.files.Close())
+		a.closeErr = errors.Join(a.logs.Close(), a.inspection.Close(), a.fileops.Close(), a.gui.Close(), a.forwarding.Close(), a.execution.Close(), a.files.Close())
 		for session := range a.MCP.Sessions() {
 			a.closeErr = errors.Join(a.closeErr, session.Close())
 		}

@@ -244,6 +244,14 @@ func (m *Manager) Stop(in IDInput) (Status, error) {
 	return snapshot(r), nil
 }
 func (m *Manager) Read(in ReadInput) (ReadResult, error) {
+	in.WaitMS = 0
+	return m.ReadContext(context.Background(), in)
+}
+
+func (m *Manager) ReadContext(ctx context.Context, in ReadInput) (ReadResult, error) {
+	if in.WaitMS < 0 || in.WaitMS > 30000 {
+		return ReadResult{}, failure("invalid_argument", "wait_ms must be between 0 and 30000")
+	}
 	r, err := m.get(in.ID)
 	if err != nil {
 		return ReadResult{}, err
@@ -273,11 +281,51 @@ func (m *Manager) Read(in ReadInput) (ReadResult, error) {
 			return ReadResult{}, failure("invalid_argument", "The output stream must be stdout or stderr")
 		}
 	}
-	out, err := b.read(in.Cursor, in.Limit)
-	out.ID = in.ID
-	out.Stream = in.Stream
-	out.State = state.State
-	return out, err
+	var timer *time.Timer
+	var deadline <-chan time.Time
+	if in.WaitMS > 0 {
+		timer = time.NewTimer(time.Duration(in.WaitMS) * time.Millisecond)
+		defer timer.Stop()
+		deadline = timer.C
+	}
+	finishReason := ""
+	for {
+		out, changed, err := b.readSubscribe(in.Cursor, in.Limit)
+		if err != nil {
+			return ReadResult{}, err
+		}
+		out.ID, out.Stream, out.State = in.ID, in.Stream, snapshot(r).State
+		switch {
+		case in.WaitMS == 0:
+			out.Reason = "immediate"
+		case finishReason != "":
+			out.Reason = finishReason
+		case out.NextCursor > out.StartCursor:
+			out.Reason = "output"
+		case out.State == "exited":
+			// 退出状态在输出排空后发布，再读一次确保末尾字节没有遗漏。
+			out, err = b.read(in.Cursor, in.Limit)
+			out.ID, out.Stream, out.State = in.ID, in.Stream, "exited"
+			out.Reason = "exit"
+			if out.NextCursor > out.StartCursor {
+				out.Reason = "output"
+			}
+			return out, err
+		}
+		if out.Reason != "" {
+			return out, nil
+		}
+		select {
+		case <-changed:
+		case <-r.done:
+		case <-m.stop:
+			finishReason = "cancelled"
+		case <-ctx.Done():
+			finishReason = "cancelled"
+		case <-deadline:
+			finishReason = "timeout"
+		}
+	}
 }
 func (m *Manager) Write(ctx context.Context, in WriteInput) (WriteResult, error) {
 	r, err := m.get(in.ID)

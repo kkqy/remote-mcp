@@ -12,8 +12,11 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"remote-mcp/internal/execution"
+	"remote-mcp/internal/fileops"
 	"remote-mcp/internal/forwarding"
 	"remote-mcp/internal/gui"
+	"remote-mcp/internal/inspection"
+	"remote-mcp/internal/logstream"
 	"remote-mcp/internal/transfer"
 )
 
@@ -34,6 +37,12 @@ func toolDomain(name string) string {
 		return "execution"
 	case "port_forward_create", "port_forward_list", "port_forward_status", "port_forward_stop":
 		return "forwarding"
+	case "file_list", "file_read", "file_search", "file_patch":
+		return "fileops"
+	case "environment_inspect", "process_inspect", "network_listeners", "network_probe":
+		return "inspection"
+	case "log_open", "log_read", "log_close":
+		return "logstream"
 	}
 	return ""
 }
@@ -45,6 +54,9 @@ func knownBusinessCode(domain, code string) bool {
 		"transfer":   "CANCELED CHECKSUM_MISMATCH CLOSED CONFLICT INVALID_ARGUMENT INVALID_OFFSET INVALID_STATE IO_ERROR LIMIT_EXCEEDED NOT_FOUND PERMISSION_DENIED SOURCE_CHANGED",
 		"execution":  "invalid_argument closed conflict resource_limit internal io_error not_found invalid_state busy interrupted timeout start_failed",
 		"forwarding": "invalid_argument closed conflict resource_limit internal not_found listen_failed",
+		"fileops":    "invalid_argument closed timeout cancelled not_found permission_denied io_error symlink not_directory not_regular conflict file_too_large invalid_utf8 invalid_patch write_failed cleanup_failed publish_failed",
+		"inspection": "invalid_argument closed resource_limit dependency_missing permission_denied unsupported io_error timeout cancelled dns_failed tcp_failed tls_failed http_failed",
+		"logstream":  "invalid_argument not_found permission_denied not_regular io_error resource_limit closed internal",
 	}
 	for _, known := range strings.Fields(codes[domain]) {
 		if known == code {
@@ -82,6 +94,53 @@ func businessDiagnostic(domain string, call *mcp.CallToolResult, err error) (too
 		var business *forwarding.Error
 		if errors.As(err, &business) && business != nil {
 			diagnostic.code, diagnostic.message = business.Code, business.Message
+		}
+	case "fileops":
+		var business *fileops.Error
+		if errors.As(err, &business) && business != nil {
+			diagnostic.code, diagnostic.message = business.Code, business.Message
+		}
+	case "logstream":
+		var business *logstream.Error
+		if errors.As(err, &business) && business != nil {
+			diagnostic.code, diagnostic.message = business.Code, business.Message
+		}
+	case "inspection":
+		var business *inspection.Error
+		if errors.As(err, &business) && business != nil {
+			diagnostic.code, diagnostic.message = business.Code, business.Message
+			break
+		}
+		if call == nil {
+			break
+		}
+		var outcome inspection.Result
+		switch output := call.StructuredContent.(type) {
+		case inspection.Result:
+			outcome = output
+		case inspection.EnvironmentResult:
+			outcome = output.Result
+		case inspection.ProcessesResult:
+			outcome = output.Result
+		case inspection.ListenersResult:
+			outcome = output.Result
+		case inspection.ProbeResult:
+			outcome = output.Result
+		case json.RawMessage:
+			// 仅精确巡检工具域允许读取受限原始结构；不读取 stages、正文或任意 Content。
+			if len(output) <= maxBusinessMessageBytes {
+				var projected struct {
+					OK      *bool  `json:"ok"`
+					Code    string `json:"code"`
+					Message string `json:"message"`
+				}
+				if json.Unmarshal(output, &projected) == nil && projected.OK != nil && !*projected.OK {
+					outcome.Code, outcome.Message = projected.Code, projected.Message
+				}
+			}
+		}
+		if !outcome.OK {
+			diagnostic.code, diagnostic.message = outcome.Code, outcome.Message
 		}
 	case "transfer":
 		if call == nil {
@@ -322,7 +381,7 @@ func diagnosticContentValues(arguments json.RawMessage) []string {
 			}
 		}
 	}
-	for _, name := range []string{"text", "path", "dir", "command", "args", "env", "data", "data_base64"} {
+	for _, name := range []string{"text", "path", "dir", "command", "args", "env", "data", "data_base64", "query", "edits", "target", "expected_sha256"} {
 		collect(fields[name], 0)
 	}
 	sort.Slice(values, func(i, j int) bool { return len(values[i]) > len(values[j]) })

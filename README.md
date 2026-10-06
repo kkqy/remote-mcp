@@ -203,6 +203,62 @@ Windows CI previously exposed a problem where redirected host standard input/out
 
 The recorded Linux/amd64 validation passed race tests, static analysis, an upload/run/download cycle with real binaries, and an actual 257 MiB bidirectional MCP transfer. The large-file test took approximately 29.74 seconds, with a sampled peak heap increase of about 9.46 MiB and matching SHA-256 hashes at both ends. A sampled heap increase is not equivalent to operating system RSS.
 
+## 远程调试：巡检、等待日志与文本补丁
+
+以下能力与已有上传、执行和终端工具共用 `/mcp`、鉴权及服务账号权限，无新增 CLI 参数。
+
+| 工具 | 用途与主要参数 |
+| --- | --- |
+| `environment_inspect` | 系统、架构、内核、hostname；可选 `runtimes` 为 go/node/python/java/dotnet 的子集 |
+| `process_inspect` | 有界 PID/PPID/name 快照；可选 `root_pid` 返回根进程及后代 |
+| `network_listeners` | IPv4/IPv6 TCP LISTEN 地址、端口及可见 PID；可选 `pid/port/limit` |
+| `network_probe` | `mode` 为 dns/tcp/tls/http，`target` 分别为 hostname、host:port 或 HTTP(S) URL |
+| `process_read`、`terminal_read` | 新增 `wait_ms`，缺省或 0 保持立即读取，最大 30000 ms |
+| `log_open/read/close` | 跟踪已有普通日志文件；read 使用 `id/generation/cursor/limit/wait_ms` |
+| `file_list` | `path/offset/limit` 单目录分页，返回 `next_offset` 和限制原因 |
+| `file_read` | `path/start_line/line_count/max_bytes` 按行读取 UTF-8，返回全文件 `sha256` |
+| `file_search` | `path/query` 区分大小写的字面子串；可配置深度、条目、字节和命中预算 |
+| `file_patch` | `path/expected_sha256/edits` 校验原内容后修改已有普通 UTF-8 文件 |
+
+巡检默认总预算 5 秒，`timeout_ms` 最多 10000；最多 4 个并发巡检。快照默认返回 256 项，单次最多 4096，内部 PID/FD 扫描也有界。返回 `partial/warnings/truncated/visibility` 表示权限、依赖、扫描上限或可见性缺口；空列表不证明整机没有对象。Linux 使用当前 `/proc` namespace，Windows 使用 Toolhelp 与 IP Helper，macOS 使用固定 `/bin/ps` 和 `lsof` 参数；缺少依赖或权限不足提供英文代码与具体原因。运行时探测使用服务账号 PATH，不采集完整环境变量或进程命令行。
+
+网络探测沿 DNS→TCP→TLS→HTTP 共用一个 deadline。失败仍保留 `structuredContent` 中的 `stages/failed_stage/code/message`；IP 字面量可跳过 DNS。TLS 使用系统 CA 校验证书，HTTP 固定一次 GET，不走代理、不跟随重定向、不读取正文；HTTP 4xx/5xx 是有效协议响应，业务健康由调用方判断。例如：
+
+```json
+{"name":"network_probe","arguments":{"mode":"http","target":"http://127.0.0.1:8080/health","timeout_ms":3000}}
+```
+
+执行 read 的 `reason` 区分 `immediate/output/exit/timeout/cancelled`。原始 Base64 字节、字节游标、UTF-8 视图及截断标记继续保留；HTTP 取消只结束本次等待，不停止应用进程。先将上次 `next_cursor` 带回，再等待新输出：
+
+```json
+{"name":"process_read","arguments":{"id":"resource-id","stream":"stdout","cursor":128,"wait_ms":10000}}
+```
+
+日志资源默认最多 32 个，空闲 10 分钟回收，文件变化约每 100 ms 检查，单次最多 64 KiB。`log_open` 返回 `generation/end_cursor`：从头读取用 cursor=0，只读取以后追加内容用 end_cursor。调用 `log_read` 时同时传回上次 `generation/next_cursor`；路径替换或缩短会重置代际与偏移，返回 `rotated/truncated`。等待式结果还可用 `reason=rotated/truncated` 表示文件变化；立即读取仍是 `immediate`，变化看布尔标记。两个采样之间瞬间截断又恢复、同一文件原地重写且尺寸没有缩短，可能无法检测；它不是文件审计协议。显式 `log_close` 或服务关闭结束资源。
+
+文件读取和修改默认最多 8 MiB，返回文本最多 64 KiB；`next_line` 是首个未完整返回的行。`truncated/reason=byte_limit` 时可在上限内提高 `max_bytes` 重读；超过 64 KiB 的长行仅提供有限 UTF-8 预览，跳过此行用 `end_line+1`，不要把重复返回的前缀盲目拼接。完整字节可使用原下载工具。搜索逐行匹配字面子串，不跨行匹配，最多 10000 条目、64 MiB 扫描、每文件 8 MiB、16 层和 1000 命中，结果也有字节预算。长行在文件扫描预算内完整匹配，返回预览可能没有展示命中位置；`issues/truncated/reason` 说明无效 UTF-8、权限失败或预算限制。目录分页采用文件系统枚举顺序，目录并发变化时 offset 会移动；不承诺稳定快照，也不跟随符号链接。
+
+补丁行号从 1 开始，按**原文件**坐标严格递增且不重叠；`total_lines+1` 可追加。`text` 是确切替换字节，调用方自行携带 LF 或 CRLF，不自动补换行。先读取全文件 hash，再发送行补丁，例如原第二行使用 CRLF：
+
+```json
+{"name":"file_read","arguments":{"path":"/srv/app/config.txt","start_line":1,"line_count":20}}
+```
+
+```json
+{"name":"file_patch","arguments":{"path":"/srv/app/config.txt","expected_sha256":"<sha256-from-file_read>","edits":[{"start_line":2,"delete_count":1,"text":"新的配置\r\n"}]}}
+```
+
+错误哈希或已观测到的外部修改返回 `conflict` 并保留现有目标。同目录临时文件校验、同步、关闭后才原子替换，失败清理临时名称；本模块补丁串行执行。请求断开或等待取消后，应重新 `file_read` 核对实际 hash，再决定下一步，不盲目重试旧 hash。最终哈希复核与发布之间仍存在外部非合作写入窗口，不提供严格文件系统 CAS。权限保持遵循平台可移植权限位，不能把它等同于 Windows 自定义 ACL 的完整复制。取消在文件系统操作之间检查，无法强制中断已阻塞的内核文件操作。
+
+普通日志只记录工具、耗时、结果及受控英文错误码与原因，不记录文件内容、query、edits、URL、运行时版本输出或凭据。Linux 本机测试与六组无 CGO 构建分别验收，Windows/macOS 原生 PID、端口、终端和文件行为仍待对应平台验证；新增 P0 不消除 GUI 任务的原生验收缺口。DAP、调试会话聚合、诊断包、反向隧道和新增 GUI 留待后续。
+
+真实本机二进制闭环（不访问 GUI 或公网）：
+
+```sh
+python3 scripts/p0-smoke.py --bin-dir dist/linux-amd64
+python3 scripts/p0-smoke.py --bin-dir dist/linux-amd64 --no-token
+```
+
 ## 图形桌面截图与操作
 
 GUI 工具使用原有 `/mcp` 入口、匿名或可选 Token 模式，只操作服务运行账号的当前用户图形桌面。请在已登录的图形会话中启动服务；SSH、后台系统服务、锁屏或安全桌面不保证有可访问的图形会话。匿名模式下，能够连接服务的客户端也可申请桌面操作。GUI 依赖或权限缺失只影响 GUI 工具，文件、进程、终端和转发仍可使用。
