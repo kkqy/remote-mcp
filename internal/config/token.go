@@ -15,23 +15,23 @@ func LoadToken(file string) (string, error) {
 	if file != "" {
 		f, err := os.Open(file)
 		if err != nil {
-			return "", errors.New("无法打开 Token 文件")
+			return "", errors.New("Unable to open token file")
 		}
 		defer f.Close()
 		info, err := f.Stat()
 		if err != nil || !info.Mode().IsRegular() || info.Size() > 8192 {
-			return "", errors.New("Token 文件必须是小于 8 KiB 的普通文件")
+			return "", errors.New("Token file must be a regular file no larger than 8 KiB")
 		}
 		if runtime.GOOS != "windows" && info.Mode().Perm()&0077 != 0 {
-			return "", errors.New("Token 文件仅允许运行账号访问，请设置权限 0600")
+			return "", errors.New("Token file must be accessible only to the service account; set permissions to 0600")
 		}
 		data, err := io.ReadAll(io.LimitReader(f, 8193))
 		if err != nil || len(data) > 8192 {
-			return "", errors.New("无法读取 Token 文件")
+			return "", errors.New("Unable to read token file")
 		}
 		token = strings.TrimSpace(string(data))
 		if token == "" {
-			return "", errors.New("Token 文件不能为空")
+			return "", errors.New("Token file must not be empty")
 		}
 	}
 	if err := ValidateToken(token); err != nil {
@@ -42,11 +42,11 @@ func LoadToken(file string) (string, error) {
 
 func ValidateToken(token string) error {
 	if len(token) > 8192 {
-		return errors.New("Token 最多为 8 KiB")
+		return errors.New("Token must not exceed 8 KiB")
 	}
 	for _, b := range []byte(token) {
 		if b <= 32 || b >= 127 {
-			return errors.New("Token 必须由不含空白的可打印 ASCII 字符组成")
+			return errors.New("Token must contain printable ASCII characters without whitespace")
 		}
 	}
 	return nil

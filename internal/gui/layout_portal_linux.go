@@ -26,7 +26,7 @@ func layoutDigest(value any) ([32]byte, error) {
 	normalize = func(v reflect.Value, depth int) (any, error) {
 		nodes++
 		if nodes > 8192 || depth > 24 {
-			return nil, errors.New("布局数据过大")
+			return nil, errors.New("Layout data exceeds the limit")
 		}
 		if !v.IsValid() {
 			return nil, nil
@@ -41,7 +41,7 @@ func layoutDigest(value any) ([32]byte, error) {
 		case reflect.Map:
 			out := map[string]any{}
 			if v.Len() > 256 || v.Type().Key().Kind() != reflect.String {
-				return nil, errors.New("布局字典无效")
+				return nil, errors.New("Invalid layout dictionary")
 			}
 			for _, key := range v.MapKeys() {
 				data, err := normalize(v.MapIndex(key), depth+1)
@@ -53,7 +53,7 @@ func layoutDigest(value any) ([32]byte, error) {
 			return out, nil
 		case reflect.Slice, reflect.Array:
 			if v.Len() > 4096 {
-				return nil, errors.New("布局数组过大")
+				return nil, errors.New("Layout array exceeds the limit")
 			}
 			out := make([]any, v.Len())
 			for i := range out {
@@ -66,7 +66,7 @@ func layoutDigest(value any) ([32]byte, error) {
 			return out, nil
 		case reflect.String:
 			if v.Len() > 4096 {
-				return nil, errors.New("布局字符串过大")
+				return nil, errors.New("Layout string exceeds the limit")
 			}
 			return v.String(), nil
 		default:
@@ -89,19 +89,19 @@ func (d *waylandDesktop) readLayout(ctx context.Context, e layoutEndpoint) ([32]
 		return [32]byte{}, "", call.Err
 	}
 	if len(call.Body) == 0 {
-		return [32]byte{}, "", errors.New("布局响应为空")
+		return [32]byte{}, "", errors.New("Empty layout response")
 	}
 	var value any
 	if e == gnomeLayout {
 		serial, ok := call.Body[0].(uint32)
 		if !ok {
-			return [32]byte{}, "", errors.New("布局序号无效")
+			return [32]byte{}, "", errors.New("Invalid layout serial")
 		}
 		value = serial
 	} else {
 		config, ok := call.Body[0].(map[string]dbus.Variant)
 		if !ok || len(config) == 0 {
-			return [32]byte{}, "", errors.New("布局字典无效")
+			return [32]byte{}, "", errors.New("Invalid layout dictionary")
 		}
 		value = config
 	}
@@ -111,7 +111,7 @@ func (d *waylandDesktop) readLayout(ctx context.Context, e layoutEndpoint) ([32]
 	}
 	var owner string
 	if err := d.conn.BusObject().CallWithContext(ctx, "org.freedesktop.DBus.GetNameOwner", 0, e.service).Store(&owner); err != nil || owner == "" {
-		return [32]byte{}, "", errors.New("布局服务不可确认")
+		return [32]byte{}, "", errors.New("Unable to verify the layout service")
 	}
 	return digest, owner, nil
 }
@@ -163,7 +163,7 @@ func (d *waylandDesktop) markLayoutInvalid() {
 		if d.caps.Reasons == nil {
 			d.caps.Reasons = map[string]string{}
 		}
-		d.caps.Reasons["absolute_input"] = "显示器布局、缩放或监视服务发生改变；需要重新打开授权会话"
+		d.caps.Reasons["absolute_input"] = "The display layout, scaling, or monitoring service has changed; open a new authorized session"
 	}
 }
 

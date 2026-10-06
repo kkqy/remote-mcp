@@ -77,7 +77,7 @@ class EncodingTest(unittest.TestCase):
                 encoding=kwargs.get("encoding", "cp1252"),
             )
             service.poll.return_value = 0
-            data = diagnostic if diagnostic is not None else "启动成功，允许匿名访问".encode("utf-8")
+            data = diagnostic if diagnostic is not None else "Startup succeeded; anonymous access is allowed.".encode("utf-8")
             os.write(kwargs["stderr"].fileno(), data)
             return service
 
@@ -157,7 +157,7 @@ class EncodingTest(unittest.TestCase):
 
     def test_failed_log_check_does_not_report_success(self):
         output = io.StringIO()
-        with self.assertRaisesRegex(AssertionError, "普通日志泄漏凭据"):
+        with self.assertRaisesRegex(AssertionError, "Regular logs leaked credentials"):
             self.run_main(output, diagnostic=b"smoke-test-token")
         self.assertEqual(output.getvalue(), "")
 

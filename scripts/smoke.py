@@ -25,10 +25,10 @@ def read_startup(service, timeout=15):
             while True:
                 line = service.stdout.readline()
                 if not line:
-                    raise RuntimeError("服务启动失败")
+                    raise RuntimeError("Service startup failed")
                 document += line
                 if len(document) > 64 * 1024:
-                    raise RuntimeError("服务启动配置过大")
+                    raise RuntimeError("Service startup configuration exceeds the limit")
                 try:
                     result.put(json.loads(document))
                     return
@@ -41,7 +41,7 @@ def read_startup(service, timeout=15):
     try:
         value = result.get(timeout=timeout)
     except queue.Empty as error:
-        raise TimeoutError("等待服务启动配置超时") from error
+        raise TimeoutError("Timed out waiting for service startup configuration") from error
     if isinstance(value, Exception):
         raise value
     return value
@@ -63,9 +63,9 @@ def stop_service(service, timeout=15):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--bin-dir", default="dist/linux-amd64", help="两个二进制所在目录")
-    parser.add_argument("--no-token", action="store_true", help="验证未配置 Token 的匿名模式")
+    parser = argparse.ArgumentParser(description="Validate upload, independent JSON-RPC execution, and download using real binaries.")
+    parser.add_argument("--bin-dir", default="dist/linux-amd64", help="Directory containing both binaries")
+    parser.add_argument("--no-token", action="store_true", help="Validate anonymous mode without a configured token")
     args = parser.parse_args()
     binary_dir = Path(args.bin_dir).resolve()
     suffix = ".exe" if os.name == "nt" else ""
@@ -81,7 +81,7 @@ def main():
         )
         try:
             config = read_startup(service)
-            assert "mcpServers" not in config, "不应输出旧的 mcpServers 配置"
+            assert "mcpServers" not in config, "Startup configuration must not contain the legacy mcpServers format"
             assert config["$schema"] == "https://opencode.ai/config.json"
             entry = config["mcp"]["remote-mcp"]
             assert entry["type"] == "remote"
@@ -91,7 +91,7 @@ def main():
             if token:
                 assert entry["headers"] == {"Authorization": "Bearer " + token}
             else:
-                assert "headers" not in entry, "匿名启动配置不应包含 headers"
+                assert "headers" not in entry, "Anonymous startup configuration must not contain headers"
             headers = {
                 "Content-Type": "application/json",
                 "Accept": "application/json, text/event-stream",
@@ -115,13 +115,13 @@ def main():
                     body = response.read()
                 result = json.loads(body) if body else {}
                 if "error" in result:
-                    raise RuntimeError("JSON-RPC 调用失败")
+                    raise RuntimeError("JSON-RPC call failed")
                 return result.get("result", {})
 
             def tool(name, arguments):
                 result = rpc("tools/call", {"name": name, "arguments": arguments})
                 if result.get("isError"):
-                    raise RuntimeError("工具调用失败: " + name)
+                    raise RuntimeError("Tool call failed: " + name)
                 return result["structuredContent"]
 
             initialized = rpc("initialize", {
@@ -211,9 +211,9 @@ def main():
                 logs.seek(0)
                 diagnostic = logs.read()
                 if token:
-                    assert token not in diagnostic, "普通日志泄漏凭据"
+                    assert token not in diagnostic, "Regular logs leaked credentials"
                 else:
-                    assert "允许匿名访问" in diagnostic, "启动日志应说明匿名模式"
+                    assert "anonymous access is allowed" in diagnostic, "Startup logs must identify anonymous mode"
             finally:
                 logs.close()
     print(json.dumps({"ok": True, "authentication": "token" if token else "anonymous", "platform": platform.platform(), "architecture": platform.machine(), "bytes": len(expected), "sha256": received["sha256"]}, ensure_ascii=False))

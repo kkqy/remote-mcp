@@ -67,22 +67,22 @@ func loadMacAPI() (*macAPI, error) {
 		a := &macAPI{}
 		cg, err := purego.Dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", purego.RTLD_NOW|purego.RTLD_GLOBAL)
 		if err != nil {
-			macLoadErr = failure("dependency_missing", "无法加载 CoreGraphics")
+			macLoadErr = failure("dependency_missing", "Unable to load CoreGraphics")
 			return
 		}
 		ax, err := purego.Dlopen("/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices", purego.RTLD_NOW|purego.RTLD_GLOBAL)
 		if err != nil {
-			macLoadErr = failure("dependency_missing", "无法加载 ApplicationServices")
+			macLoadErr = failure("dependency_missing", "Unable to load ApplicationServices")
 			return
 		}
 		if _, err = purego.Dlopen("/System/Library/Frameworks/Foundation.framework/Foundation", purego.RTLD_NOW|purego.RTLD_GLOBAL); err != nil {
-			macLoadErr = failure("dependency_missing", "无法加载 Foundation")
+			macLoadErr = failure("dependency_missing", "Unable to load Foundation")
 			return
 		}
 		bind := func(dst any, h uintptr, name string) bool {
 			p, e := purego.Dlsym(h, name)
 			if e != nil {
-				macLoadErr = failure("unsupported", "当前系统缺少必要的图形接口")
+				macLoadErr = failure("unsupported", "Required graphical APIs are unavailable on this system")
 				return false
 			}
 			purego.RegisterFunc(dst, p)
@@ -113,7 +113,7 @@ func loadMacAPI() (*macAPI, error) {
 			}
 		}
 		if objc.GetClass("SCScreenshotManager") == 0 && a.legacyCapture == nil {
-			macLoadErr = failure("unsupported", "系统没有可用的原生屏幕采集接口")
+			macLoadErr = failure("unsupported", "No native screen capture API is available on this system")
 			return
 		}
 		macLoaded = a
@@ -133,22 +133,22 @@ type macGUI struct {
 func newPlatformBackend(cfg Config) Backend { return &macGUI{cfg: cfg} }
 func (m *macGUI) check(ctx context.Context) error {
 	if m.closed.Load() {
-		return failure("session_closed", "图形会话已关闭")
+		return failure("session_closed", "GUI session is closed")
 	}
 	return ctx.Err()
 }
 func (m *macGUI) Capabilities() Capabilities {
 	a, e := loadMacAPI()
 	if e != nil {
-		return Capabilities{Reasons: map[string]string{"backend": "原生图形框架不可用"}}
+		return Capabilities{Reasons: map[string]string{"backend": "Native graphical frameworks are unavailable"}}
 	}
 	screen, input := a.preflight(), a.trusted()
-	reasons := map[string]string{"clipboard": "原生 Unicode 输入可用；未提供剪贴板模式"}
+	reasons := map[string]string{"clipboard": "Native Unicode input is available; clipboard mode is not provided"}
 	if !screen {
-		reasons["screenshot"] = "需要系统屏幕录制权限"
+		reasons["screenshot"] = "Screen recording permission is required"
 	}
 	if !input {
-		reasons["input"] = "需要系统辅助功能权限"
+		reasons["input"] = "Accessibility permission is required"
 	}
 	return Capabilities{Screenshot: screen, Mouse: input, Keyboard: input, Text: input, DirectText: input, Reasons: reasons}
 }
@@ -186,7 +186,7 @@ func (m *macGUI) Open(ctx context.Context) (Desktop, error) {
 		return nil, e
 	}
 	if !a.preflight() && !a.trusted() {
-		return nil, failure("permission_denied", "需要在系统设置授予屏幕录制或辅助功能权限")
+		return nil, failure("permission_denied", "Grant screen recording or accessibility permission in System Settings")
 	}
 	return d, nil
 }
@@ -206,21 +206,21 @@ func (m *macGUI) Displays(ctx context.Context) ([]Display, error) {
 	}
 	var count uint32
 	if a.list(0, nil, &count) != 0 || count == 0 {
-		return nil, failure("no_gui", "未找到当前用户可访问的显示器")
+		return nil, failure("no_gui", "No displays accessible to the current user were found")
 	}
 	if count > 128 {
-		return nil, failure("limit_exceeded", "显示器数量超过上限")
+		return nil, failure("limit_exceeded", "Display count exceeds the limit")
 	}
 	ids := make([]uint32, count)
 	if a.list(count, &ids[0], &count) != 0 {
-		return nil, failure("no_gui", "读取显示器布局失败")
+		return nil, failure("no_gui", "Failed to read the display layout")
 	}
 	out := make([]Display, 0, count)
 	for _, id := range ids[:count] {
 		b := a.bounds(id)
 		mode := a.mode(id)
 		if mode == 0 {
-			return nil, failure("capture_failed", "读取显示器像素模式失败")
+			return nil, failure("capture_failed", "Failed to read the display pixel mode")
 		}
 		w, h := int(a.pixelWidth(mode)), int(a.pixelHeight(mode))
 		a.releaseMode(mode)
@@ -229,7 +229,7 @@ func (m *macGUI) Displays(ctx context.Context) ([]Display, error) {
 			w, h = h, w
 		}
 		if w <= 0 || h <= 0 || b.Size.Width <= 0 || b.Size.Height <= 0 {
-			return nil, failure("capture_failed", "显示器尺寸无效")
+			return nil, failure("capture_failed", "Invalid display dimensions")
 		}
 		out = append(out, Display{ID: strconv.FormatUint(uint64(id), 10), Primary: id == a.main(), PixelWidth: w, PixelHeight: h, LogicalBounds: Bounds{b.Origin.X, b.Origin.Y, b.Size.Width, b.Size.Height}, AbsoluteInput: true})
 	}
@@ -282,7 +282,7 @@ func (m *macGUI) captureModern(ctx context.Context, id uint32, d Display) (uintp
 		return 0, time.Time{}, ctx.Err()
 	}
 	if content == 0 {
-		return 0, time.Time{}, failure("capture_failed", "获取可采集显示器失败，检查屏幕录制权限")
+		return 0, time.Time{}, failure("capture_failed", "Failed to obtain capturable displays; check screen recording permission")
 	}
 	defer content.Send(objc.RegisterName("release"))
 	displays := content.Send(objc.RegisterName("displays"))
@@ -296,17 +296,17 @@ func (m *macGUI) captureModern(ctx context.Context, id uint32, d Display) (uintp
 		}
 	}
 	if target == 0 {
-		return 0, time.Time{}, failure("stale_capture", "指定显示器当前不可采集")
+		return 0, time.Time{}, failure("stale_capture", "The specified display is not currently available for capture")
 	}
 	empty := objc.ID(objc.GetClass("NSArray")).Send(objc.RegisterName("array"))
 	filter := objc.ID(objc.GetClass("SCContentFilter")).Send(objc.RegisterName("alloc")).Send(objc.RegisterName("initWithDisplay:excludingWindows:"), target, empty)
 	if filter == 0 {
-		return 0, time.Time{}, failure("capture_failed", "创建显示器采集过滤器失败")
+		return 0, time.Time{}, failure("capture_failed", "Failed to create the display capture filter")
 	}
 	cfg := objc.ID(objc.GetClass("SCStreamConfiguration")).Send(objc.RegisterName("new"))
 	if cfg == 0 {
 		filter.Send(objc.RegisterName("release"))
-		return 0, time.Time{}, failure("capture_failed", "创建屏幕采集配置失败")
+		return 0, time.Time{}, failure("capture_failed", "Failed to create the screen capture configuration")
 	}
 	cfg.Send(objc.RegisterName("setWidth:"), uintptr(d.PixelWidth))
 	cfg.Send(objc.RegisterName("setHeight:"), uintptr(d.PixelHeight))
@@ -326,7 +326,7 @@ func (m *macGUI) captureModern(ctx context.Context, id uint32, d Display) (uintp
 	select {
 	case r := <-images:
 		if r.failed || r.object == 0 {
-			return 0, time.Time{}, failure("capture_failed", "系统屏幕采集失败，检查屏幕录制授权")
+			return 0, time.Time{}, failure("capture_failed", "System screen capture failed; check screen recording authorization")
 		}
 		return r.object, r.at, nil
 	case <-ctx.Done():
@@ -347,18 +347,18 @@ func (m *macGUI) Capture(ctx context.Context, d Display) (Frame, error) {
 		return Frame{}, e
 	}
 	if !m.api.preflight() {
-		return Frame{}, failure("permission_denied", "未获系统屏幕录制权限")
+		return Frame{}, failure("permission_denied", "Screen recording permission has not been granted")
 	}
 	if d.PixelWidth <= 0 || d.PixelHeight <= 0 || d.PixelWidth > m.cfg.MaxPixels/d.PixelHeight {
-		return Frame{}, failure("limit_exceeded", "显示器截图超过像素上限")
+		return Frame{}, failure("limit_exceeded", "Display screenshot exceeds the pixel limit")
 	}
 	if !m.captureBusy.CompareAndSwap(false, true) {
-		return Frame{}, failure("busy", "屏幕采集正在进行")
+		return Frame{}, failure("busy", "Screen capture is already in progress")
 	}
 	defer m.captureBusy.Store(false)
 	id, e := strconv.ParseUint(d.ID, 10, 32)
 	if e != nil {
-		return Frame{}, failure("invalid_argument", "显示器标识无效")
+		return Frame{}, failure("invalid_argument", "Invalid display ID")
 	}
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
@@ -376,15 +376,15 @@ func (m *macGUI) Capture(ctx context.Context, d Display) (Frame, error) {
 		at = time.Now()
 	}
 	if cg == 0 {
-		return Frame{}, failure("capture_failed", "原生屏幕采集没有返回图像")
+		return Frame{}, failure("capture_failed", "Native screen capture did not return an image")
 	}
 	defer m.api.imageRelease(cg)
 	w, h := int(m.api.imageWidth(cg)), int(m.api.imageHeight(cg))
 	if w <= 0 || h <= 0 || w > m.cfg.MaxPixels/h {
-		return Frame{}, failure("limit_exceeded", "原生截图超过像素上限")
+		return Frame{}, failure("limit_exceeded", "Native screenshot exceeds the pixel limit")
 	}
 	if w != d.PixelWidth || h != d.PixelHeight {
-		return Frame{}, failure("stale_capture", "显示器像素尺寸已变化，请重新读取布局")
+		return Frame{}, failure("stale_capture", "Display pixel dimensions changed; read the layout again")
 	}
 	if e = m.check(ctx); e != nil {
 		return Frame{}, e
@@ -392,12 +392,12 @@ func (m *macGUI) Capture(ctx context.Context, d Display) (Frame, error) {
 	img := image.NewRGBA(image.Rect(0, 0, w, h))
 	color := m.api.colorSpace()
 	if color == 0 {
-		return Frame{}, failure("capture_failed", "创建截图颜色空间失败")
+		return Frame{}, failure("capture_failed", "Failed to create the screenshot color space")
 	}
 	defer m.api.colorRelease(color)
 	bitmap := m.api.bitmap(unsafe.Pointer(&img.Pix[0]), uintptr(w), uintptr(h), 8, uintptr(img.Stride), color, 0x4001)
 	if bitmap == 0 {
-		return Frame{}, failure("capture_failed", "创建截图位图上下文失败")
+		return Frame{}, failure("capture_failed", "Failed to create the screenshot bitmap context")
 	}
 	m.api.translate(bitmap, 0, float64(h))
 	m.api.scale(bitmap, 1, -1)
@@ -411,7 +411,7 @@ func (m *macGUI) inputCheck(ctx context.Context) error {
 		return e
 	}
 	if !m.api.trusted() {
-		return failure("permission_denied", "未获系统辅助功能权限")
+		return failure("permission_denied", "Accessibility permission has not been granted")
 	}
 	return nil
 }
@@ -420,7 +420,7 @@ func (m *macGUI) postNative(ctx context.Context, e uintptr, release bool) error 
 	m.nativeMu.Lock()
 	defer m.nativeMu.Unlock()
 	if e == 0 {
-		return failure("input_failed", "创建原生输入事件失败")
+		return failure("input_failed", "Failed to create the native input event")
 	}
 	defer m.api.release(e)
 	if !release {
@@ -511,7 +511,7 @@ func (m *macGUI) Key(ctx context.Context, keys []string) error {
 	}
 	for _, k := range keys {
 		if _, ok := macKeyCode(k); !ok {
-			return failure("unsupported", "当前平台不支持指定按键")
+			return failure("unsupported", "The current platform does not support the requested key")
 		}
 	}
 	return performKeys(ctx, keys, func(c context.Context, k string, down bool) error {
@@ -532,7 +532,7 @@ func (m *macGUI) Key(ctx context.Context, keys []string) error {
 }
 func (m *macGUI) Text(ctx context.Context, in TextInput) (InputResult, error) {
 	if in.Mode == "clipboard" {
-		return InputResult{}, failure("unsupported", "macOS 后端使用原生 Unicode 输入，不支持显式剪贴板模式")
+		return InputResult{}, failure("unsupported", "The macOS backend uses native Unicode input and does not support explicit clipboard mode")
 	}
 	if e := m.inputCheck(ctx); e != nil {
 		return InputResult{}, e
@@ -542,7 +542,7 @@ func (m *macGUI) Text(ctx context.Context, in TextInput) (InputResult, error) {
 		u := utf16.Encode([]rune{r})
 		event := m.api.keyEvent(0, 0, true)
 		if event == 0 {
-			err := failure("input_failed", "创建文本输入事件失败")
+			err := failure("input_failed", "Failed to create the text input event")
 			if applied {
 				err = partialError(err)
 			}

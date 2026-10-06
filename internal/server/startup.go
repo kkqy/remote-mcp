@@ -47,7 +47,7 @@ func LocalInterfaces() ([]Interface, error) {
 func CandidateAddresses(bound *net.TCPAddr, enumerate Enumerate) ([]netip.Addr, error) {
 	addr, ok := netip.AddrFromSlice(bound.IP)
 	if !ok {
-		return nil, fmt.Errorf("监听器未返回 IP 地址")
+		return nil, fmt.Errorf("Listener did not return an IP address")
 	}
 	addr = addr.Unmap()
 	if bound.Zone != "" {
@@ -99,17 +99,17 @@ type ClientConfig struct {
 
 func WriteStartup(out, diagnostics io.Writer, bound *net.TCPAddr, secure bool, token string, enumerate Enumerate) error {
 	if token == "" {
-		fmt.Fprintln(diagnostics, "未配置 Token，当前允许匿名访问。")
+		fmt.Fprintln(diagnostics, "No token configured; anonymous access is allowed.")
 	} else {
-		fmt.Fprintln(diagnostics, "已启用 Token 鉴权，启动配置包含当前 Token。")
+		fmt.Fprintln(diagnostics, "Token authentication enabled; startup configuration contains the current token.")
 	}
 	addresses, err := CandidateAddresses(bound, enumerate)
 	if err != nil {
-		fmt.Fprintln(diagnostics, "无法枚举本机地址；服务已监听，请手动配置连接地址。")
+		fmt.Fprintln(diagnostics, "Unable to enumerate local addresses; service is listening. Configure the connection address manually.")
 		return nil
 	}
 	if len(addresses) == 0 {
-		fmt.Fprintln(diagnostics, "没有匹配的可展示地址；服务已监听，请检查网卡和绑定设置。")
+		fmt.Fprintln(diagnostics, "No matching address to display; service is listening. Check network interfaces and bind settings.")
 		return nil
 	}
 	scheme := "http"
@@ -118,11 +118,11 @@ func WriteStartup(out, diagnostics io.Writer, bound *net.TCPAddr, secure bool, t
 	}
 	enc := json.NewEncoder(out)
 	enc.SetIndent("", "  ")
-	fmt.Fprintln(diagnostics, "以下每段 JSON 是同一服务的 OpenCode 备选配置，请选择 Agent 可达的一份合并到 opencode.json。")
+	fmt.Fprintln(diagnostics, "Each JSON block below is an alternative OpenCode configuration for the same service. Choose one reachable by your agent and merge it into opencode.json.")
 	for _, ip := range addresses {
 		endpoint := url.URL{Scheme: scheme, Host: net.JoinHostPort(ip.String(), strconv.Itoa(bound.Port)), Path: "/mcp"}
 		if ip.IsLoopback() {
-			fmt.Fprintln(diagnostics, "回环地址仅供本机连接。")
+			fmt.Fprintln(diagnostics, "Loopback addresses are for local connections only.")
 		}
 		entry := ClientEntry{Type: "remote", URL: endpoint.String(), Enabled: true, OAuth: false}
 		if token != "" {
@@ -130,7 +130,7 @@ func WriteStartup(out, diagnostics io.Writer, bound *net.TCPAddr, secure bool, t
 		}
 		conf := ClientConfig{Schema: "https://opencode.ai/config.json", Servers: map[string]ClientEntry{"remote-mcp": entry}}
 		if err := enc.Encode(conf); err != nil {
-			return fmt.Errorf("写入启动配置失败")
+			return fmt.Errorf("Failed to write startup configuration")
 		}
 	}
 	return nil

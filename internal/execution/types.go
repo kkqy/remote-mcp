@@ -22,18 +22,18 @@ func DefaultConfig() Config {
 }
 
 type StartInput struct {
-	RequestID  string            `json:"request_id" jsonschema:"创建去重键，同一键只能对应同一参数"`
-	Command    string            `json:"command" jsonschema:"可执行文件，管道和重定向需显式使用 shell"`
+	RequestID  string            `json:"request_id" jsonschema:"Creation deduplication key; each key must identify identical parameters"`
+	Command    string            `json:"command" jsonschema:"Executable; pipes and redirection require an explicit shell"`
 	Args       []string          `json:"args,omitempty"`
 	Dir        string            `json:"dir,omitempty"`
 	Env        map[string]string `json:"env,omitempty"`
 	Background bool              `json:"background,omitempty"`
-	TimeoutMS  *int64            `json:"timeout_ms,omitempty" jsonschema:"省略使用默认超时，只有后台模式可设置为零"`
-	WaitMS     int               `json:"wait_ms,omitempty" jsonschema:"等待结束的毫秒数，范围0到10000"`
+	TimeoutMS  *int64            `json:"timeout_ms,omitempty" jsonschema:"Defaults to the configured timeout; only background mode accepts zero"`
+	WaitMS     int               `json:"wait_ms,omitempty" jsonschema:"Milliseconds to wait for completion; range 0 to 10000"`
 }
 type TerminalInput struct {
 	RequestID string            `json:"request_id"`
-	Command   string            `json:"command,omitempty" jsonschema:"省略时使用平台默认 shell"`
+	Command   string            `json:"command,omitempty" jsonschema:"Defaults to the platform shell"`
 	Args      []string          `json:"args,omitempty"`
 	Dir       string            `json:"dir,omitempty"`
 	Env       map[string]string `json:"env,omitempty"`
@@ -45,13 +45,13 @@ type IDInput struct {
 }
 type ReadInput struct {
 	ID     string `json:"id"`
-	Stream string `json:"stream,omitempty" jsonschema:"普通进程选 stdout 或 stderr，终端固定 terminal"`
-	Cursor int64  `json:"cursor,omitempty" jsonschema:"原始字节的绝对游标"`
+	Stream string `json:"stream,omitempty" jsonschema:"Use stdout or stderr for a process; terminals use terminal"`
+	Cursor int64  `json:"cursor,omitempty" jsonschema:"Absolute cursor in raw bytes"`
 	Limit  int    `json:"limit,omitempty"`
 }
 type WriteInput struct {
 	ID         string `json:"id"`
-	DataBase64 string `json:"data_base64" jsonschema:"原始终端输入；Ctrl+C 为单字节03的Base64 Aw=="`
+	DataBase64 string `json:"data_base64" jsonschema:"Raw terminal input; Ctrl+C is the single byte 03 encoded as Base64 Aw=="`
 }
 type ResizeInput struct {
 	ID      string `json:"id"`

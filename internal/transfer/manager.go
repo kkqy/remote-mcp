@@ -49,7 +49,7 @@ type Manager struct {
 
 func New(cfg Config) (*Manager, error) {
 	if cfg.MaxFileSize <= 0 || cfg.ChunkSize <= 0 || cfg.ChunkSize > 16<<20 || cfg.MaxTransfers <= 0 || cfg.MaxRecords < cfg.MaxTransfers || cfg.IdleTimeout <= 0 || cfg.Retention <= 0 {
-		return nil, errors.New("文件传输限额无效")
+		return nil, errors.New("Invalid file transfer limits")
 	}
 	m := &Manager{cfg: cfg, entries: make(map[string]*entry), requests: make(map[string]string), stop: make(chan struct{}), done: make(chan struct{})}
 	m.ctx, m.cancel = context.WithCancel(context.Background())
@@ -135,20 +135,20 @@ func failure(code, message string) Result { return Result{Code: code, Message: m
 func ioFailure(err error) Result {
 	switch {
 	case errors.Is(err, os.ErrExist):
-		return failure("CONFLICT", "目标已存在")
+		return failure("CONFLICT", "The destination already exists")
 	case errors.Is(err, os.ErrNotExist):
-		return failure("NOT_FOUND", "文件或目录不存在")
+		return failure("NOT_FOUND", "The file or directory does not exist")
 	case errors.Is(err, os.ErrPermission):
-		return failure("PERMISSION_DENIED", "文件权限不足")
+		return failure("PERMISSION_DENIED", "Insufficient file permissions")
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
-		return failure("CANCELED", "操作已取消或超时")
+		return failure("CANCELED", "The operation was canceled or timed out")
 	default:
-		return failure("IO_ERROR", "文件操作失败")
+		return failure("IO_ERROR", "The file operation failed")
 	}
 }
 func (m *Manager) admission() Result {
 	if m.closed {
-		return failure("CLOSED", "文件管理器已关闭")
+		return failure("CLOSED", "The file manager is closed")
 	}
 	m.sweep(time.Now())
 	active := 0
@@ -158,7 +158,7 @@ func (m *Manager) admission() Result {
 		}
 	}
 	if active >= m.cfg.MaxTransfers || len(m.entries) >= m.cfg.MaxRecords {
-		return failure("LIMIT_EXCEEDED", "传输数量或保留记录已达上限")
+		return failure("LIMIT_EXCEEDED", "The transfer count or retained record limit has been reached")
 	}
 	return Result{OK: true}
 }
@@ -167,24 +167,24 @@ func (m *Manager) result(e *entry) Result {
 }
 func (m *Manager) lookup(id, kind string) (*entry, Result) {
 	if m.closed {
-		return nil, failure("CLOSED", "文件管理器已关闭")
+		return nil, failure("CLOSED", "The file manager is closed")
 	}
 	e := m.entries[id]
 	if e == nil || e.kind != kind {
-		return nil, failure("NOT_FOUND", "传输不存在")
+		return nil, failure("NOT_FOUND", "The transfer does not exist")
 	}
 	if e.state == "active" && time.Since(e.touched) >= m.cfg.IdleTimeout {
 		_ = m.release(e, "expired")
 	}
 	if e.state != "active" {
-		return nil, failure("INVALID_STATE", "传输已结束："+e.state)
+		return nil, failure("INVALID_STATE", "The transfer has ended: "+e.state)
 	}
 	e.touched = time.Now()
 	return e, Result{}
 }
 func absolute(path string) (string, error) {
 	if path == "" {
-		return "", errors.New("路径为空")
+		return "", errors.New("The path is empty")
 	}
 	return filepath.Abs(path)
 }
@@ -202,18 +202,18 @@ func (m *Manager) Stat(_ context.Context, in PathInput) Result {
 	closed := m.closed
 	m.mu.Unlock()
 	if closed {
-		return failure("CLOSED", "文件管理器已关闭")
+		return failure("CLOSED", "The file manager is closed")
 	}
 	path, err := absolute(in.Path)
 	if err != nil {
-		return failure("INVALID_ARGUMENT", "路径无效")
+		return failure("INVALID_ARGUMENT", "Invalid path")
 	}
 	info, err := os.Stat(path)
 	if err != nil {
 		return ioFailure(err)
 	}
 	if !info.Mode().IsRegular() {
-		return failure("INVALID_ARGUMENT", "仅支持普通文件")
+		return failure("INVALID_ARGUMENT", "Only regular files are supported")
 	}
 	return Result{OK: true, Path: path, Size: info.Size()}
 }
@@ -221,15 +221,15 @@ func (m *Manager) UploadCreate(_ context.Context, in UploadInput) Result {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.closed {
-		return failure("CLOSED", "文件管理器已关闭")
+		return failure("CLOSED", "The file manager is closed")
 	}
 	path, err := absolute(in.Path)
 	if err != nil {
-		return failure("INVALID_ARGUMENT", "路径无效")
+		return failure("INVALID_ARGUMENT", "Invalid path")
 	}
 	digest, err := hex.DecodeString(in.SHA256)
 	if in.RequestID == "" || len(in.RequestID) > 128 || in.Size < 0 || err != nil || len(digest) != sha256.Size {
-		return failure("INVALID_ARGUMENT", "request_id、size 或 sha256 无效")
+		return failure("INVALID_ARGUMENT", "Invalid request_id, size, or sha256")
 	}
 	in.Path = path
 	in.SHA256 = strings.ToLower(in.SHA256)
@@ -237,7 +237,7 @@ func (m *Manager) UploadCreate(_ context.Context, in UploadInput) Result {
 	if id, ok := m.requests[in.RequestID]; ok {
 		e := m.entries[id]
 		if e.input != in {
-			return failure("CONFLICT", "request_id 参数不一致")
+			return failure("CONFLICT", "The parameters differ for the same request_id")
 		}
 		if e.state == "active" {
 			e.touched = time.Now()
@@ -245,14 +245,14 @@ func (m *Manager) UploadCreate(_ context.Context, in UploadInput) Result {
 		return m.result(e)
 	}
 	if in.Size > m.cfg.MaxFileSize {
-		return failure("LIMIT_EXCEEDED", "文件超过大小上限")
+		return failure("LIMIT_EXCEEDED", "The file exceeds the size limit")
 	}
 	if r := m.admission(); !r.OK {
 		return r
 	}
 	if !in.Overwrite {
 		if _, err := os.Lstat(path); err == nil {
-			return failure("CONFLICT", "目标已存在")
+			return failure("CONFLICT", "The destination already exists")
 		} else if !errors.Is(err, os.ErrNotExist) {
 			return ioFailure(err)
 		}
@@ -274,22 +274,22 @@ func (m *Manager) UploadWrite(_ context.Context, in WriteInput) Result {
 		return r
 	}
 	if in.Offset != e.offset {
-		return failure("INVALID_OFFSET", "偏移必须等于下一写入位置")
+		return failure("INVALID_OFFSET", "The offset must match the next write position")
 	}
 	if len(in.Data) > base64.StdEncoding.EncodedLen(m.cfg.ChunkSize) {
-		return failure("LIMIT_EXCEEDED", "分块超过上限")
+		return failure("LIMIT_EXCEEDED", "The chunk exceeds the size limit")
 	}
 	data, err := base64.StdEncoding.Strict().DecodeString(in.Data)
 	if err != nil || len(data) == 0 {
-		return failure("INVALID_ARGUMENT", "分块必须是非空有效 Base64")
+		return failure("INVALID_ARGUMENT", "The chunk must be nonempty valid Base64")
 	}
 	if len(data) > m.cfg.ChunkSize || int64(len(data)) > e.size-e.offset {
-		return failure("LIMIT_EXCEEDED", "分块超过块限额或声明长度")
+		return failure("LIMIT_EXCEEDED", "The chunk exceeds the chunk limit or declared file length")
 	}
 	n, err := e.file.Write(data)
 	if err != nil || n != len(data) {
 		_ = m.release(e, "failed")
-		return failure("IO_ERROR", "分块写入失败")
+		return failure("IO_ERROR", "Failed to write the chunk")
 	}
 	_, _ = e.hash.Write(data)
 	e.offset += int64(n)
@@ -307,7 +307,7 @@ func (m *Manager) UploadFinish(_ context.Context, in IDInput) Result {
 	}
 	if e.offset != e.size || hex.EncodeToString(e.hash.Sum(nil)) != e.digest {
 		_ = m.release(e, "failed")
-		return failure("CHECKSUM_MISMATCH", "文件长度或 SHA-256 不一致，上传已清理")
+		return failure("CHECKSUM_MISMATCH", "The file length or SHA-256 does not match; the upload has been cleaned up")
 	}
 	if err := e.file.Sync(); err != nil {
 		_ = m.release(e, "failed")
@@ -331,7 +331,7 @@ func (m *Manager) UploadCancel(_ context.Context, in IDInput) Result {
 	defer m.mu.Unlock()
 	e := m.entries[in.ID]
 	if m.closed || e == nil || e.kind != "upload" {
-		return failure("NOT_FOUND", "上传不存在")
+		return failure("NOT_FOUND", "The upload does not exist")
 	}
 	if e.state == "active" {
 		if err := m.release(e, "canceled"); err != nil {
@@ -386,7 +386,7 @@ func Unchanged(file *os.File, path string, before os.FileInfo) bool {
 func (m *Manager) DownloadOpen(ctx context.Context, in PathInput) Result {
 	path, err := absolute(in.Path)
 	if err != nil {
-		return failure("INVALID_ARGUMENT", "路径无效")
+		return failure("INVALID_ARGUMENT", "Invalid path")
 	}
 	m.mu.Lock()
 	if r := m.admission(); !r.OK {
@@ -416,10 +416,10 @@ func (m *Manager) DownloadOpen(ctx context.Context, in PathInput) Result {
 		return ioFailure(err)
 	}
 	if !info.Mode().IsRegular() {
-		return failure("INVALID_ARGUMENT", "仅支持普通文件")
+		return failure("INVALID_ARGUMENT", "Only regular files are supported")
 	}
 	if info.Size() > m.cfg.MaxFileSize {
-		return failure("LIMIT_EXCEEDED", "文件超过大小上限")
+		return failure("LIMIT_EXCEEDED", "The file exceeds the size limit")
 	}
 	file, err := os.Open(path)
 	if err != nil {
@@ -431,19 +431,19 @@ func (m *Manager) DownloadOpen(ctx context.Context, in PathInput) Result {
 		}
 	}()
 	if !Unchanged(file, path, info) {
-		return failure("SOURCE_CHANGED", "源文件已变化")
+		return failure("SOURCE_CHANGED", "The source file has changed")
 	}
 	digest, err := HashFile(workCtx, file)
 	if err != nil {
 		return ioFailure(err)
 	}
 	if !Unchanged(file, path, info) {
-		return failure("SOURCE_CHANGED", "源文件在哈希期间发生变化")
+		return failure("SOURCE_CHANGED", "The source file changed while its hash was being computed")
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.closed || workCtx.Err() != nil {
-		return failure("CANCELED", "下载初始化已取消")
+		return failure("CANCELED", "Download initialization was canceled")
 	}
 	e.file = file
 	e.info = info
@@ -462,11 +462,11 @@ func (m *Manager) DownloadRead(_ context.Context, in ReadInput) Result {
 		return r
 	}
 	if in.Offset < 0 || in.Offset > e.size || in.Length <= 0 || in.Length > m.cfg.ChunkSize {
-		return failure("INVALID_ARGUMENT", "读取偏移或长度无效")
+		return failure("INVALID_ARGUMENT", "Invalid read offset or length")
 	}
 	if !Unchanged(e.file, e.path, e.info) {
 		_ = m.release(e, "failed")
-		return failure("SOURCE_CHANGED", "下载源文件已变化")
+		return failure("SOURCE_CHANGED", "The download source file has changed")
 	}
 	data := make([]byte, min(int64(in.Length), e.size-in.Offset))
 	n, err := e.file.ReadAt(data, in.Offset)
@@ -476,7 +476,7 @@ func (m *Manager) DownloadRead(_ context.Context, in ReadInput) Result {
 	}
 	if n != len(data) || !Unchanged(e.file, e.path, e.info) {
 		_ = m.release(e, "failed")
-		return failure("SOURCE_CHANGED", "下载源文件已变化")
+		return failure("SOURCE_CHANGED", "The download source file has changed")
 	}
 	e.offset = in.Offset + int64(n)
 	r = m.result(e)
@@ -489,18 +489,18 @@ func (m *Manager) DownloadClose(_ context.Context, in IDInput) Result {
 	defer m.mu.Unlock()
 	e := m.entries[in.ID]
 	if m.closed || e == nil || e.kind != "download" {
-		return failure("NOT_FOUND", "下载不存在")
+		return failure("NOT_FOUND", "The download does not exist")
 	}
 	if e.state == "failed" {
-		return failure("SOURCE_CHANGED", "下载源文件已变化")
+		return failure("SOURCE_CHANGED", "The download source file has changed")
 	}
 	if e.state == "expired" {
-		return failure("INVALID_STATE", "下载已过期")
+		return failure("INVALID_STATE", "The download has expired")
 	}
 	if e.state == "active" {
 		if !Unchanged(e.file, e.path, e.info) {
 			_ = m.release(e, "failed")
-			return failure("SOURCE_CHANGED", "下载源文件已变化")
+			return failure("SOURCE_CHANGED", "The download source file has changed")
 		}
 		if err := m.release(e, "closed"); err != nil {
 			return ioFailure(err)

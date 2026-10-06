@@ -38,7 +38,7 @@ class GUISmokeTest(unittest.TestCase):
 
     def test_gui_error_preserves_only_bounded_contract_message(self):
         client = module.Client.__new__(module.Client)
-        message = "Portal 尚未提供可靠的剪贴板所有权及格式快照"
+        message = "The Portal has not provided a reliable clipboard ownership and format snapshot"
         response = {"isError": True, "structuredContent": {"code": "clipboard_preservation_unavailable", "message": message}}
         client.rpc = lambda *args: response
         with self.assertRaisesRegex(RuntimeError, message):
@@ -49,14 +49,14 @@ class GUISmokeTest(unittest.TestCase):
                 client.tool(name, {})
             self.assertNotIn(invalid, str(captured.exception))
         response["structuredContent"] = []
-        with self.assertRaisesRegex(RuntimeError, "缺少结构化结果"):
+        with self.assertRaisesRegex(RuntimeError, "no structured result"):
             client.tool("gui_text", {})
 
     def test_no_execute_has_no_network_or_desktop_effect(self):
         result = subprocess.run([sys.executable, str(Path(__file__).with_name("gui-smoke.py")), "--url", "invalid-url"],
                                 capture_output=True, text=True, encoding="utf-8", timeout=5)
         self.assertEqual(result.returncode, 0)
-        self.assertIn("未执行", result.stdout)
+        self.assertIn("Not executed", result.stdout)
 
     def test_png_validates_data_and_dimensions(self):
         data = png(5, 3, lambda x, y: (x, y, 7))
@@ -178,7 +178,7 @@ class GUISmokeTest(unittest.TestCase):
             self.assertTrue(report["run_completed"])
             self.assertFalse(report["acceptance_complete"])
             self.assertTrue(report["fixture_inputs_only"])
-            self.assertTrue(any("中文实际输入及默认剪贴板恢复待验收" in pending for pending in report["pending"]))
+            self.assertTrue(any("actual Chinese text input and default clipboard restoration remain pending" in pending for pending in report["pending"]))
             fixture.terminate.assert_called_once()
 
     def test_clipboard_summary_keeps_only_hashes_and_limits_formats(self):
@@ -211,7 +211,7 @@ class GUISmokeTest(unittest.TestCase):
             self.assertEqual(module.sample_clipboard(output, fixture, "baseline"), baseline)
             self.assertEqual(module.sample_clipboard(output, fixture, "after-close", baseline), baseline)
             fixture.summary = {"formats": [{"mime": "text/plain", "length": 1, "sha256": "changed"}], "total_bytes": 1}
-            with self.assertRaisesRegex(RuntimeError, "哈希已变化"):
+            with self.assertRaisesRegex(RuntimeError, "hashes have changed"):
                 module.sample_clipboard(output, fixture, "after-text", baseline)
 
     def test_clipboard_offer_refresh_requires_identical_stable_snapshot(self):
@@ -519,12 +519,12 @@ with tempfile.TemporaryDirectory() as directory:
             fixture = mock.Mock()
             fixture.poll.return_value = None
             for value in [0, 606, True]:
-                with self.assertRaisesRegex(RuntimeError, "不超过 605"):
+                with self.assertRaisesRegex(RuntimeError, "no more than 605"):
                     module.fixture_request(Path(directory), fixture, "focus", timeout_seconds=value)
             with mock.patch.object(module.time, "monotonic", side_effect=[0, 606]):
-                with self.assertRaisesRegex(RuntimeError, "聚焦超时") as captured:
+                with self.assertRaisesRegex(RuntimeError, "focus timed out") as captured:
                     module.fixture_request(Path(directory), fixture, "focus", timeout_seconds=605)
-            self.assertNotIn("剪贴板", str(captured.exception))
+            self.assertNotIn("clipboard", str(captured.exception))
 
 
 if __name__ == "__main__":

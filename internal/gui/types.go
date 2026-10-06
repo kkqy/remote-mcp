@@ -76,7 +76,7 @@ type IDInput struct {
 }
 type OpenInput struct {
 	RequestID string `json:"request_id"`
-	WaitMS    int    `json:"wait_ms,omitempty" jsonschema:"等待授权完成的毫秒数，0到10000"`
+	WaitMS    int    `json:"wait_ms,omitempty" jsonschema:"Milliseconds to wait for authorization, from 0 to 10000"`
 }
 type ScreenshotInput struct {
 	ID        string `json:"id"`
@@ -109,19 +109,19 @@ type MouseInput struct {
 	Y          float64 `json:"y"`
 	EndX       float64 `json:"end_x,omitempty"`
 	EndY       float64 `json:"end_y,omitempty"`
-	Button     string  `json:"button,omitempty" jsonschema:"left/middle/right，省略默认left"`
+	Button     string  `json:"button,omitempty" jsonschema:"left/middle/right; defaults to left"`
 	ScrollX    int     `json:"scroll_x,omitempty"`
 	ScrollY    int     `json:"scroll_y,omitempty"`
-	DurationMS int     `json:"duration_ms,omitempty" jsonschema:"拖拽时长，0到10000毫秒"`
+	DurationMS int     `json:"duration_ms,omitempty" jsonschema:"Drag duration in milliseconds, from 0 to 10000"`
 }
 type KeyInput struct {
 	ID   string   `json:"id"`
-	Keys []string `json:"keys" jsonschema:"单键或组合键，最多8个；例如Ctrl+V使用数组Ctrl,V"`
+	Keys []string `json:"keys" jsonschema:"A single key or key combination, up to 8 keys; for Ctrl+V, use the array Ctrl,V"`
 }
 type TextInput struct {
 	ID                    string   `json:"id"`
 	Text                  string   `json:"text"`
-	Mode                  string   `json:"mode,omitempty" jsonschema:"auto/direct/clipboard，默认auto"`
+	Mode                  string   `json:"mode,omitempty" jsonschema:"auto/direct/clipboard; defaults to auto"`
 	PasteKeys             []string `json:"paste_keys,omitempty"`
 	AllowClipboardReplace bool     `json:"allow_clipboard_replace,omitempty"`
 }

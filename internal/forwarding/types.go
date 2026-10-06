@@ -22,20 +22,20 @@ func DefaultConfig() Config {
 }
 func (c Config) Validate() error {
 	if _, err := netip.ParseAddr(c.ListenHost); err != nil {
-		return failure("invalid_argument", "默认监听地址必须为 IP")
+		return failure("invalid_argument", "The default listen address must be an IP address")
 	}
 	if c.MaxRules <= 0 || c.MaxConnections <= 0 || c.DialTimeout <= 0 || c.Retention <= 0 || c.MaxRecords <= 0 || c.SweepInterval <= 0 {
-		return failure("invalid_argument", "转发限额和时间必须为正数")
+		return failure("invalid_argument", "Forwarding limits and timeouts must be positive")
 	}
 	return nil
 }
 
 type CreateInput struct {
-	RequestID  string `json:"request_id" jsonschema:"创建去重键，同一键必须使用相同参数"`
-	TargetHost string `json:"target_host" jsonschema:"运行 remote-mcp 的机器可达的 IP 或主机名，不含协议和端口"`
+	RequestID  string `json:"request_id" jsonschema:"Creation deduplication key; reuse requires identical parameters"`
+	TargetHost string `json:"target_host" jsonschema:"IP address or hostname reachable from the machine running remote-mcp; omit the protocol and port"`
 	TargetPort int    `json:"target_port"`
-	ListenHost string `json:"listen_host,omitempty" jsonschema:"明确的监听 IP，省略沿用服务监听 IP"`
-	ListenPort int    `json:"listen_port,omitempty" jsonschema:"0 或省略时自动分配端口"`
+	ListenHost string `json:"listen_host,omitempty" jsonschema:"Explicit listen IP address; defaults to the service listen IP"`
+	ListenPort int    `json:"listen_port,omitempty" jsonschema:"Use 0 or omit to allocate a port automatically"`
 }
 type IDInput struct {
 	ID string `json:"id"`

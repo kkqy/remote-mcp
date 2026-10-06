@@ -29,14 +29,14 @@ def validate_original_formats(summary, baseline, allow_qt_alias=False):
 
 def summarize(formats, read_format, max_bytes=1024 * 1024, max_formats=64):
     if len(formats) > max_formats or len(set(formats)) != len(formats):
-        raise RuntimeError("剪贴板格式数量无效或超过验证上限")
+        raise RuntimeError("The clipboard format count is invalid or exceeds the validation limit")
     result = []
     total = 0
     for mime in sorted(formats):
         data = read_format(mime)
         size = len(data)
         if size > max_bytes - total:
-            raise RuntimeError("剪贴板内容超过验证上限")
+            raise RuntimeError("The clipboard content exceeds the validation limit")
         total += size
         result.append({"mime": mime, "length": size, "sha256": hashlib.sha256(bytes(data)).hexdigest()})
     return {"formats": result, "total_bytes": total}
@@ -45,13 +45,13 @@ def summarize(formats, read_format, max_bytes=1024 * 1024, max_formats=64):
 def copy_snapshot(formats, read_format, max_bytes=1024 * 1024, max_formats=64):
     """先检查长度再复制，每个格式的完整字节仅保留在有界内存中。"""
     if len(formats) > max_formats or len(set(formats)) != len(formats):
-        raise RuntimeError("剪贴板格式数量无效或超过验证上限")
+        raise RuntimeError("The clipboard format count is invalid or exceeds the validation limit")
     contents = {}
     remaining = max_bytes
     for mime in formats:
         data = read_format(mime)
         if len(data) > remaining:
-            raise RuntimeError("剪贴板内容超过验证上限")
+            raise RuntimeError("The clipboard content exceeds the validation limit")
         remaining -= len(data)
         contents[mime] = bytes(data)
     return summarize(formats, contents.__getitem__, max_bytes, max_formats), contents

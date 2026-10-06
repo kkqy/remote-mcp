@@ -104,7 +104,7 @@ func TestAnonymousStartupConfigurations(t *testing.T) {
 	if err := decoder.Decode(new(map[string]any)); !errors.Is(err, io.EOF) {
 		t.Fatal("配置数量错误")
 	}
-	if !strings.Contains(diag.String(), "允许匿名访问") || strings.Contains(diag.String(), "包含当前 Token") {
+	if !strings.Contains(diag.String(), "anonymous access is allowed") || strings.Contains(diag.String(), "contains the current token") {
 		t.Fatal(diag.String())
 	}
 }

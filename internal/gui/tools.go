@@ -9,7 +9,7 @@ import (
 
 func toolResult(out any, err error) *mcp.CallToolResult {
 	if err != nil {
-		var result any = &Error{Code: "session_closed", Message: "图形操作失败"}
+		var result any = &Error{Code: "session_closed", Message: "GUI operation failed"}
 		var e *Error
 		if errors.As(err, &e) {
 			result = e
@@ -27,10 +27,10 @@ func register[I, O any](s *mcp.Server, name, description string, fn func(context
 	})
 }
 func (m *Manager) Register(s *mcp.Server) {
-	register(s, "gui_status", "查询当前图形后端或会话能力；不触发桌面授权。", m.Status)
-	register(s, "gui_open", "创建当前用户图形桌面会话，Wayland 可能要求本机用户确认授权。", m.Open)
-	register(s, "gui_close", "关闭图形会话并释放桌面授权、输入及采集资源。", m.CloseSession)
-	mcp.AddTool(s, &mcp.Tool{Name: "gui_screenshot", Description: "获取获授权显示器的原始 PNG 或区域截图；图片坐标用于后续鼠标操作。"}, func(ctx context.Context, _ *mcp.CallToolRequest, in ScreenshotInput) (*mcp.CallToolResult, any, error) {
+	register(s, "gui_status", "Query the current GUI backend or session capabilities without requesting desktop authorization.", m.Status)
+	register(s, "gui_open", "Open a GUI session for the current user; Wayland may require local authorization.", m.Open)
+	register(s, "gui_close", "Close a GUI session and release desktop authorization, input, and capture resources.", m.CloseSession)
+	mcp.AddTool(s, &mcp.Tool{Name: "gui_screenshot", Description: "Capture an authorized display or a region as a PNG at its original size; use its image coordinates for subsequent mouse operations."}, func(ctx context.Context, _ *mcp.CallToolRequest, in ScreenshotInput) (*mcp.CallToolResult, any, error) {
 		out, err := m.Screenshot(ctx, in)
 		if err != nil {
 			return toolResult(nil, err), nil, nil
@@ -39,7 +39,7 @@ func (m *Manager) Register(s *mcp.Server) {
 		result.Content = append([]mcp.Content{&mcp.ImageContent{Data: out.PNG, MIMEType: "image/png"}}, result.Content...)
 		return result, nil, nil
 	})
-	register(s, "gui_mouse", "使用有效截图内的像素坐标移动、点击、双击、拖拽或滚动；输入提交后请截图确认。", m.Mouse)
-	register(s, "gui_key", "提交单键或组合键并释放本次按下的按键，失败可能已有部分事件生效。", m.Key)
-	register(s, "gui_text", "输入 UTF-8 文本；剪贴板兼容默认保存并恢复，无法可靠保存时只有显式允许替换才继续。", m.Text)
+	register(s, "gui_mouse", "Move, click, double-click, drag, or scroll using pixel coordinates in a valid screenshot; capture again to verify the result.", m.Mouse)
+	register(s, "gui_key", "Submit a single key or key combination and release the keys pressed by this call; some events may take effect before a failure.", m.Key)
+	register(s, "gui_text", "Enter UTF-8 text. Clipboard mode preserves and restores existing content by default; if preservation is unreliable, replacement requires explicit permission.", m.Text)
 }

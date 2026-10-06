@@ -4,6 +4,8 @@
 
 A Go MCP service deployed on a remote machine. Agents connect over a local network or VPN to transfer files, run commands, and operate real interactive terminals. The service includes two programs: the `remote-mcp` server and the `remote-mcp-transfer` local file transfer helper.
 
+程序自有错误、提示、CLI 帮助和 MCP 工具/参数说明使用英文；文档和源码注释继续使用中文。用户文件、终端输出及 GUI 输入保持原有字节或文本，支持中文。
+
 ## Build and start
 
 The module requires Go 1.25 or later and builds with Go 1.27 by default. CGO is not required:
@@ -70,7 +72,7 @@ Once the listener is ready, stdout prints a complete OpenCode configuration for 
 }
 ```
 
-VPN addresses receive separate configurations when available. **Choose a configuration reachable from your agent**; all listed addresses belong to the same service. Each block is a separate JSON object; concatenating them does not produce a single JSON document. Anonymous mode omits `headers` entirely. With authentication enabled, the configuration adds `"headers": {"Authorization": "Bearer <current token>"}` containing the actual token, so treat it as a credential. Explanatory messages in Chinese and regular logs go to stderr. Regular logs do not record tokens, environment variable values, file contents, or terminal input/output.
+VPN addresses receive separate configurations when available. **Choose a configuration reachable from your agent**; all listed addresses belong to the same service. Each block is a separate JSON object; concatenating them does not produce a single JSON document. Anonymous mode omits `headers` entirely. With authentication enabled, the configuration adds `"headers": {"Authorization": "Bearer <current token>"}` containing the actual token, so treat it as a credential. Explanatory messages in English and regular logs go to stderr. Regular logs do not record tokens, environment variable values, file contents, or terminal input/output.
 
 When listening on all interfaces, the address list excludes disabled interfaces, loopback, unspecified, multicast, and IPv6 link-local addresses. Binding to a single IP shows only that address; an explicit loopback binding is labeled as local-only. If interface enumeration fails, the service keeps running and prompts you to configure the client manually, without using `0.0.0.0` or `::` as a connection URL. Listing an interface address does not establish routing, firewall access, or certificate trust on the agent side.
 
@@ -315,7 +317,7 @@ python3 scripts/gui-smoke.py --execute --fixture --fixture-inputs-only --no-toke
 
 若原快照包含 `application/x-kde-onlyReplaceEmpty`，默认文字输入、同内容刷新及自动救援均在发布前拒绝。它是 KDE 所有权控制标记，原样复制到非空剪贴板可能被取消，不能当作普通 MIME 数据，也不会被测试自动剥除。用户主动点击恢复按钮时，若备份含此标记，会额外询问是否仅恢复有效数据并省略该控制标记；确认后仍核对有效数据摘要，但明确记录原格式集合未完全恢复，不能作为完整保存恢复验收。
 
-显式刷新还会将全部原格式字节保留在专用窗口的有界内存中，失去剪贴板所有权不清除备份，原内容不写盘或日志。失败后仅在会话已确认关闭、当前内容为空或与本次测试文字一致、读取版本稳定且 Qt 能确认本进程仍拥有提供者时自动救援；内容相等或 KDE 标记本身不能证明没有第三方所有者。无法确认时报告 `clipboard_recovery`、`fixture_retained` 和窗口 PID，保留窗口及备份，请用户点击“恢复测试前剪贴板”明确恢复后再关闭；关闭时会提醒备份尚未恢复。救援不改变本次验收失败结果。
+显式刷新还会将全部原格式字节保留在专用窗口的有界内存中，失去剪贴板所有权不清除备份，原内容不写盘或日志。失败后仅在会话已确认关闭、当前内容为空或与本次测试文字一致、读取版本稳定且 Qt 能确认本进程仍拥有提供者时自动救援；内容相等或 KDE 标记本身不能证明没有第三方所有者。无法确认时报告 `clipboard_recovery`、`fixture_retained` 和窗口 PID，保留窗口及备份，请用户点击“Restore original clipboard”（恢复原剪贴板）明确恢复后再关闭；关闭时会提醒备份尚未恢复。救援不改变本次验收失败结果。
 
 若人工授权需要更长时间，验证脚本可指定 `--authorize-wait-seconds 605`（默认 125 秒，允许 1～605 秒），并将测试服务配置为 `--gui-authorize-timeout 10m`。这只延长会话授权及 ready 后首次窗口聚焦的有界等待，不自动批准或重复发起授权。
 
@@ -334,3 +336,6 @@ python3 scripts/gui-smoke.py --execute --fixture --fixture-inputs-only --no-toke
 自定义计划默认只核验事件返回，需人工确认图像及文字。若计划包含保存操作，可增加 `"verify_text_file":{"path":"脚本可读且事前不存在的产物路径","expected":"中文测试"}` 核对应用实际保存的 UTF-8 文件。脚本与目标运行在不同机器时，产物需另行传输到可读路径，脚本不把远端路径视为本地文件。
 
 截图与元数据写入指定的新目录，专用窗口证据写入 `fixture.json`，最终 `report.json` 分列已核验与待验收项。报告始终保留 `acceptance_complete: false`，因为单次基本闭环不代替五类桌面、客户端展示、多屏混合缩放、剪贴板竞争和撤权断线的全部验收。交叉编译、模拟 HTTP 测试与真实桌面结果分别记录。
+
+
+MCP 工具失败的普通日志保留 `tool/elapsed/failed`，并输出 `error_code/error_message`，程序自有错误原因及提示使用英文；GUI 失败还可包含 `input_may_have_applied/clipboard_restore`。例如剪贴板恢复失败会保留受控的恢复原因和计数。成功调用没有错误字段。日志只接收已知内置工具域的安全业务说明；SDK 参数失败按必填缺失、类型不符等类别说明，未知工具和异常使用安全分类，不打印原始参数、内容或错误载荷。错误说明最多 1024 字节，控制字符清理，非空 Token 及可识别的输入内容脱敏；未来自定义工具需单独建立安全日志契约才能输出原文原因。

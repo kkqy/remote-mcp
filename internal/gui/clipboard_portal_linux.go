@@ -182,12 +182,12 @@ func (c *portalClipboard) prepareClose() error {
 		return nil
 	}
 	if !known || !own {
-		return failure("clipboard_restore_failed", "关闭前保留了原快照，但不能确认仍有恢复权限；未覆盖其他应用")
+		return failure("clipboard_restore_failed", "The original snapshot was preserved before closing, but restoration permission cannot be confirmed; no other application was overwritten")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	if _, err := c.set(ctx, old, epoch); err != nil {
-		return failure("clipboard_restore_failed", "关闭前再次恢复失败（"+clipboardCause(err)+"）")
+		return failure("clipboard_restore_failed", "Restoration retry before closing failed ("+clipboardCause(err)+")")
 	}
 	c.mu.Lock()
 	c.recovery = nil
@@ -201,7 +201,7 @@ func (c *portalClipboard) snapshot(ctx context.Context) (map[string][]byte, uint
 	for _, mime := range mimes {
 		if mime == "application/x-kde-onlyReplaceEmpty" {
 			c.mu.Unlock()
-			return nil, epoch, failure("clipboard_preservation_unavailable", "剪贴板包含 KDE onlyReplaceEmpty 所有权控制格式，不能在非空 selection 上原样恢复")
+			return nil, epoch, failure("clipboard_preservation_unavailable", "The clipboard contains the KDE onlyReplaceEmpty ownership control format, which cannot be restored unchanged over a nonempty selection")
 		}
 	}
 	if own && c.data != nil {
@@ -211,26 +211,26 @@ func (c *portalClipboard) snapshot(ctx context.Context) (map[string][]byte, uint
 	}
 	c.mu.Unlock()
 	if !known {
-		return nil, epoch, failure("clipboard_preservation_unavailable", "Portal 尚未提供可靠的剪贴板所有权及格式快照")
+		return nil, epoch, failure("clipboard_preservation_unavailable", "The Portal has not provided a reliable clipboard ownership and format snapshot")
 	}
 	if len(mimes) > 64 {
-		return nil, epoch, failure("clipboard_preservation_unavailable", "剪贴板格式数量超过可保存上限")
+		return nil, epoch, failure("clipboard_preservation_unavailable", "The clipboard format count exceeds the preservation limit")
 	}
 	out := map[string][]byte{}
 	remaining := c.desktop.cfg.MaxClipboardBytes
 	for _, mime := range mimes {
 		if mime == "application/vnd.portal.filetransfer" || mime == "x-special/gnome-copied-files" {
-			return nil, epoch, failure("clipboard_preservation_unavailable", "剪贴板包含不能可靠恢复的文件传输格式")
+			return nil, epoch, failure("clipboard_preservation_unavailable", "The clipboard contains file transfer formats that cannot be reliably restored")
 		}
 		var fd dbus.UnixFD
 		if err := c.call(ctx, "SelectionRead", mime).Store(&fd); err != nil {
-			return nil, epoch, failure("clipboard_preservation_unavailable", "原剪贴板格式无法读取")
+			return nil, epoch, failure("clipboard_preservation_unavailable", "Unable to read an original clipboard format")
 		}
 		file := os.NewFile(uintptr(fd), "portal-clipboard-read")
 		data, err := fdRead(ctx, file, remaining)
 		_ = file.Close()
 		if err != nil {
-			return nil, epoch, failure("clipboard_preservation_unavailable", "原剪贴板读取失败或超过限制")
+			return nil, epoch, failure("clipboard_preservation_unavailable", "Reading the original clipboard failed or exceeded the limit")
 		}
 		remaining -= len(data)
 		out[mime] = data
@@ -239,7 +239,7 @@ func (c *portalClipboard) snapshot(ctx context.Context) (map[string][]byte, uint
 	same := c.known && c.epoch == epoch
 	c.mu.Unlock()
 	if !same {
-		return nil, epoch, failure("clipboard_preservation_unavailable", "保存过程中剪贴板所有者发生改变")
+		return nil, epoch, failure("clipboard_preservation_unavailable", "The clipboard owner changed during preservation")
 	}
 	return out, epoch, nil
 }
@@ -258,7 +258,7 @@ func (c *portalClipboard) set(ctx context.Context, data map[string][]byte, expec
 	c.mu.Lock()
 	if c.epoch != expected {
 		c.mu.Unlock()
-		return update, failure("clipboard_preservation_unavailable", "替换前剪贴板所有者发生改变")
+		return update, failure("clipboard_preservation_unavailable", "The clipboard owner changed before replacement")
 	}
 	previous := c.data
 	previousOwner := c.owner
@@ -299,7 +299,7 @@ func (c *portalClipboard) set(ctx context.Context, data map[string][]byte, expec
 		} else if errors.Is(callErr, context.Canceled) || errors.Is(callErr, context.DeadlineExceeded) {
 			cause = clipboardCause(callErr)
 		}
-		return update, failure("input_failed", "Portal 剪贴板设置失败：method_error/"+cause)
+		return update, failure("input_failed", "Portal clipboard update failed: method_error/"+cause)
 	}
 	update.applied = true
 	for {
@@ -326,7 +326,7 @@ func (c *portalClipboard) set(ctx context.Context, data map[string][]byte, expec
 				} else if own && !matching {
 					reason = "mimetype_mismatch"
 				}
-				return update, failure("clipboard_preservation_unavailable", fmt.Sprintf("设置未获目标格式及所有权确认：%s/%s（代次%d→%d，格式数%d）", reason, clipboardCause(ctx.Err()), expected, update.epoch, mimeCount))
+				return update, failure("clipboard_preservation_unavailable", fmt.Sprintf("The clipboard update did not confirm the target formats and ownership: %s/%s (epoch %d->%d, format count %d)", reason, clipboardCause(ctx.Err()), expected, update.epoch, mimeCount))
 			}
 			return update, ctx.Err()
 		}
@@ -341,11 +341,11 @@ func (c *portalClipboard) text(ctx context.Context, in TextInput) (out InputResu
 	c.mu.Lock()
 	if c.closing {
 		c.mu.Unlock()
-		return out, failure("session_closed", "桌面授权会话正在关闭")
+		return out, failure("session_closed", "The authorized desktop session is closing")
 	}
 	if c.recovery != nil {
 		c.mu.Unlock()
-		return out, failure("clipboard_restore_failed", "前次原剪贴板仍待恢复，拒绝再次替换")
+		return out, failure("clipboard_restore_failed", "The previous clipboard snapshot still needs restoration; further replacement is refused")
 	}
 	c.abort = cancel
 	c.mu.Unlock()
@@ -417,7 +417,7 @@ drained:
 			if known && !owner && epochNow > epoch {
 				if !update.confirmed {
 					out.ClipboardRestore = "unknown"
-					err = &Error{Code: "clipboard_restore_failed", Message: "设置尚未确认，非owner通知不能证明第三方最终接管；原快照保留到安全恢复或关闭（" + clipboardCause(err) + "）", InputMayHaveApplied: out.Submitted, ClipboardRestore: "unknown"}
+					err = &Error{Code: "clipboard_restore_failed", Message: "The update is unconfirmed; a non-owner notification does not prove a third party has taken final ownership. The original snapshot is retained until safe restoration or closing (" + clipboardCause(err) + ")", InputMayHaveApplied: out.Submitted, ClipboardRestore: "unknown"}
 					return
 				}
 				out.ClipboardRestore = "skipped_new_owner"
@@ -430,13 +430,13 @@ drained:
 			case <-c.changed:
 			case <-cleanup.Done():
 				out.ClipboardRestore = "unknown"
-				err = &Error{Code: "clipboard_restore_failed", Message: "剪贴板替换可能已生效，但无法确认安全恢复所需的所有权", InputMayHaveApplied: out.Submitted, ClipboardRestore: "unknown"}
+				err = &Error{Code: "clipboard_restore_failed", Message: "Clipboard replacement may have taken effect, but ownership required for safe restoration cannot be confirmed", InputMayHaveApplied: out.Submitted, ClipboardRestore: "unknown"}
 				return
 			}
 		}
 		if _, restoreErr := c.set(cleanup, old, ownedEpoch); restoreErr != nil {
 			out.ClipboardRestore = "failed"
-			err = &Error{Code: "clipboard_restore_failed", Message: "文本事件可能已经生效，但原剪贴板恢复失败（" + clipboardCause(restoreErr) + "）", InputMayHaveApplied: out.Submitted, ClipboardRestore: "failed"}
+			err = &Error{Code: "clipboard_restore_failed", Message: "Text events may have taken effect, but the original clipboard could not be restored (" + clipboardCause(restoreErr) + ")", InputMayHaveApplied: out.Submitted, ClipboardRestore: "failed"}
 		} else {
 			out.ClipboardRestore = "restored"
 			c.mu.Lock()

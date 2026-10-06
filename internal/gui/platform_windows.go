@@ -66,7 +66,7 @@ type windowsGUI struct {
 
 func newPlatformBackend(cfg Config) Backend { return &windowsGUI{cfg: cfg} }
 func (w *windowsGUI) Capabilities() Capabilities {
-	return Capabilities{Screenshot: true, Mouse: true, Keyboard: true, Text: true, DirectText: true, Reasons: map[string]string{"clipboard": "原生 Unicode 输入可用；未提供剪贴板模式"}}
+	return Capabilities{Screenshot: true, Mouse: true, Keyboard: true, Text: true, DirectText: true, Reasons: map[string]string{"clipboard": "Native Unicode input is available; clipboard mode is not provided"}}
 }
 func (w *windowsGUI) Probe(ctx context.Context) (Status, error) {
 	ds, err := w.Displays(ctx)
@@ -91,7 +91,7 @@ func (w *windowsGUI) Close() error {
 }
 func (w *windowsGUI) check(ctx context.Context) error {
 	if w.closed.Load() {
-		return failure("session_closed", "图形会话已关闭")
+		return failure("session_closed", "GUI session is closed")
 	}
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -104,12 +104,12 @@ func winThread() (func(), error) {
 	runtime.LockOSThread()
 	if err := guiSetDPI.Find(); err != nil {
 		runtime.UnlockOSThread()
-		return nil, failure("unsupported", "系统缺少线程 DPI 感知接口，需要 Windows 10 1703 或更新版本")
+		return nil, failure("unsupported", "Thread DPI awareness is unavailable; Windows 10 version 1703 or later is required")
 	}
 	old, _, _ := guiSetDPI.Call(^uintptr(3))
 	if old == 0 {
 		runtime.UnlockOSThread()
-		return nil, failure("input_failed", "设置线程 DPI 感知失败")
+		return nil, failure("input_failed", "Failed to set thread DPI awareness")
 	}
 	return func() { guiSetDPI.Call(old); runtime.UnlockOSThread() }, nil
 }
@@ -125,12 +125,12 @@ func winDesktopName(h uintptr) string {
 func winInteractive() error {
 	h, _, _ := guiOpenInputDesktop.Call(0, 0, 1)
 	if h == 0 {
-		return failure("no_gui", "无法访问当前交互桌面，锁屏或服务会话不支持 GUI")
+		return failure("no_gui", "The current interactive desktop is inaccessible; locked desktops and service sessions do not support GUI operations")
 	}
 	defer guiCloseDesktop.Call(h)
 	current, _, _ := guiGetThreadDesktop.Call(uintptr(windows.GetCurrentThreadId()))
 	if winDesktopName(h) != "Default" || winDesktopName(current) != "Default" {
-		return failure("permission_denied", "当前线程与可输入桌面不一致，或正在安全桌面")
+		return failure("permission_denied", "The current thread is not on the input desktop, or the secure desktop is active")
 	}
 	return nil
 }
@@ -171,7 +171,7 @@ func (w *windowsGUI) Displays(ctx context.Context) ([]Display, error) {
 	ok, _, _ := guiEnumMonitors.Call(0, 0, winEnumCallback, 0)
 	ds := winEnumDisplays
 	if ok == 0 || len(ds) == 0 {
-		return nil, failure("no_gui", "未找到可用的交互显示器")
+		return nil, failure("no_gui", "No available interactive displays were found")
 	}
 	return ds, nil
 }
@@ -180,7 +180,7 @@ func (w *windowsGUI) Capture(ctx context.Context, d Display) (Frame, error) {
 		return Frame{}, err
 	}
 	if d.PixelWidth <= 0 || d.PixelHeight <= 0 || d.PixelWidth > w.cfg.MaxPixels/d.PixelHeight {
-		return Frame{}, failure("limit_exceeded", "显示器截图超过像素上限")
+		return Frame{}, failure("limit_exceeded", "Display screenshot exceeds the pixel limit")
 	}
 	restore, err := winThread()
 	if err != nil {
@@ -192,34 +192,34 @@ func (w *windowsGUI) Capture(ctx context.Context, d Display) (Frame, error) {
 	}
 	screen, _, _ := guiGetDC.Call(0)
 	if screen == 0 {
-		return Frame{}, failure("capture_failed", "无法取得桌面绘图上下文")
+		return Frame{}, failure("capture_failed", "Unable to obtain the desktop device context")
 	}
 	defer guiReleaseDC.Call(0, screen)
 	mem, _, _ := guiCreateDC.Call(screen)
 	if mem == 0 {
-		return Frame{}, failure("capture_failed", "无法创建截图绘图上下文")
+		return Frame{}, failure("capture_failed", "Unable to create the screenshot device context")
 	}
 	defer guiDeleteDC.Call(mem)
 	info := winBitmapInfo{Size: 40, Width: int32(d.PixelWidth), Height: -int32(d.PixelHeight), Planes: 1, BitCount: 32}
 	var pixels unsafe.Pointer
 	bitmap, _, _ := guiDIB.Call(screen, uintptr(unsafe.Pointer(&info)), 0, uintptr(unsafe.Pointer(&pixels)), 0, 0)
 	if bitmap == 0 || pixels == nil {
-		return Frame{}, failure("capture_failed", "创建截图位图失败")
+		return Frame{}, failure("capture_failed", "Failed to create the screenshot bitmap")
 	}
 	defer guiDeleteObject.Call(bitmap)
 	old, _, _ := guiSelectObject.Call(mem, bitmap)
 	if old == 0 || old == ^uintptr(0) {
-		return Frame{}, failure("capture_failed", "选择截图位图失败")
+		return Frame{}, failure("capture_failed", "Failed to select the screenshot bitmap")
 	}
 	defer guiSelectObject.Call(mem, old)
 	ok, _, _ := guiBitBlt.Call(mem, 0, 0, uintptr(d.PixelWidth), uintptr(d.PixelHeight), screen, uintptr(int32(d.LogicalBounds.X)), uintptr(int32(d.LogicalBounds.Y)), 0x40cc0020)
 	flushed, _, _ := guiGDIFlush.Call()
 	if flushed == 0 {
-		return Frame{}, failure("capture_failed", "同步截图位图失败")
+		return Frame{}, failure("capture_failed", "Failed to synchronize the screenshot bitmap")
 	}
 	at := time.Now()
 	if ok == 0 {
-		return Frame{}, failure("capture_failed", "桌面截图失败")
+		return Frame{}, failure("capture_failed", "Desktop screenshot capture failed")
 	}
 	if err = w.check(ctx); err != nil {
 		return Frame{}, err
@@ -270,7 +270,7 @@ func (w *windowsGUI) sendNative(ctx context.Context, i winInput, release bool) e
 	}
 	n, _, _ := guiSendInput.Call(1, uintptr(unsafe.Pointer(&i)), unsafe.Sizeof(i))
 	if n != 1 {
-		return &Error{Code: "input_failed", Message: "输入事件未完全提交，检查目标应用权限与当前桌面", InputMayHaveApplied: true}
+		return &Error{Code: "input_failed", Message: "Input events were not fully submitted; check the target application's permissions and the current desktop", InputMayHaveApplied: true}
 	}
 	return nil
 }
@@ -289,7 +289,7 @@ func (w *windowsGUI) Mouse(ctx context.Context, e MouseEvent) error {
 		ww, _, _ := guiMetrics.Call(78)
 		hh, _, _ := guiMetrics.Call(79)
 		if int32(ww) <= 1 || int32(hh) <= 1 {
-			return failure("no_gui", "虚拟桌面尺寸无效")
+			return failure("no_gui", "Invalid virtual desktop dimensions")
 		}
 		x, y := winAbsolute(p.X+e.Display.LogicalBounds.X, p.Y+e.Display.LogicalBounds.Y, int32(a), int32(b), int32(ww), int32(hh))
 		return w.send(c, winMouseInput(x, y, 0, 0xc001))
@@ -339,7 +339,7 @@ func (w *windowsGUI) Key(ctx context.Context, keys []string) error {
 	}
 	for _, k := range keys {
 		if _, ok := winVK(k); !ok {
-			return failure("unsupported", "当前平台不支持指定按键")
+			return failure("unsupported", "The current platform does not support the requested key")
 		}
 	}
 	return performKeys(ctx, keys, func(c context.Context, k string, down bool) error {
@@ -356,7 +356,7 @@ func (w *windowsGUI) Key(ctx context.Context, keys []string) error {
 }
 func (w *windowsGUI) Text(ctx context.Context, in TextInput) (InputResult, error) {
 	if in.Mode == "clipboard" {
-		return InputResult{}, failure("unsupported", "Windows 后端使用原生 Unicode 文本输入，不支持显式剪贴板模式")
+		return InputResult{}, failure("unsupported", "The Windows backend uses native Unicode text input and does not support explicit clipboard mode")
 	}
 	applied := false
 	for _, u := range utf16.Encode([]rune(in.Text)) {

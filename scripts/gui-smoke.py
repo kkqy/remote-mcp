@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""显式连接真实桌面，保存截图并按调用方提供的专用目标计划验证输入。"""
+"""Connect explicitly to a native desktop, save screenshots, and validate input using a caller-provided dedicated target plan."""
 import argparse
 import base64
 import hashlib
@@ -31,9 +31,9 @@ def authorize_wait(value):
     try:
         seconds = int(value)
     except ValueError:
-        raise argparse.ArgumentTypeError("授权等待须为 1 至 605 秒的整数") from None
+        raise argparse.ArgumentTypeError("Authorization wait must be an integer between 1 and 605 seconds") from None
     if seconds < 1 or seconds > 605:
-        raise argparse.ArgumentTypeError("授权等待须为 1 至 605 秒的整数")
+        raise argparse.ArgumentTypeError("Authorization wait must be an integer between 1 and 605 seconds")
     return seconds
 
 
@@ -59,24 +59,24 @@ class Client:
                 self.headers["Mcp-Session-Id"] = session
             body = response.read(24 * 1024 * 1024 + 1)
         if len(body) > 24 * 1024 * 1024:
-            raise RuntimeError("协议响应超过验证脚本上限")
+            raise RuntimeError("The protocol response exceeds the validation script limit")
         document = json.loads(body.decode("utf-8")) if body else {}
         if document.get("error"):
-            raise RuntimeError("JSON-RPC 调用失败")
+            raise RuntimeError("The JSON-RPC call failed")
         return document.get("result", {})
 
     def tool(self, name, arguments):
         result = self.rpc("tools/call", {"name": name, "arguments": arguments})
         metadata = result.get("structuredContent", {})
         if not isinstance(metadata, dict):
-            raise RuntimeError("工具缺少结构化结果：" + name)
+            raise RuntimeError("The tool response has no structured result: " + name)
         if result.get("isError") or metadata.get("ok") is False:
             # 仅保留 GUI 契约的有界固定错误说明，不转发图片、参数、剪贴板或其他工具消息。
             code = metadata.get("code", "tool_failed")
-            description = "工具调用失败：" + name + "（" + str(code) + "）"
+            description = "Tool call failed: " + name + " (" + str(code) + ")"
             message = metadata.get("message")
             if name in GUI_TOOLS and code in GUI_ERROR_CODES and isinstance(message, str) and 0 < len(message) <= 512 and all(ord(character) >= 32 and ord(character) != 127 for character in message):
-                description += "：" + message
+                description += ": " + message
             raise RuntimeError(description)
         return metadata, result
 
@@ -84,50 +84,50 @@ class Client:
 def decode_png(data):
     """校验 PNG 块、CRC 和全部解压扫描行；不只读取文件头。"""
     if not data.startswith(b"\x89PNG\r\n\x1a\n"):
-        raise RuntimeError("截图不是 PNG")
+        raise RuntimeError("The screenshot is not a PNG")
     cursor, compressed, dimensions, ended = 8, bytearray(), None, False
     while cursor < len(data):
         if cursor + 12 > len(data):
-            raise RuntimeError("PNG 块被截断")
+            raise RuntimeError("A PNG chunk is truncated")
         size = struct.unpack_from(">I", data, cursor)[0]
         kind = data[cursor + 4:cursor + 8]
         content = data[cursor + 8:cursor + 8 + size]
         if cursor + size + 12 > len(data):
-            raise RuntimeError("PNG 数据被截断")
+            raise RuntimeError("PNG data is truncated")
         checksum = struct.unpack_from(">I", data, cursor + 8 + size)[0]
         if zlib.crc32(kind + content) & 0xffffffff != checksum:
-            raise RuntimeError("PNG CRC 校验失败")
+            raise RuntimeError("PNG CRC validation failed")
         if kind == b"IHDR":
             if dimensions is not None or size != 13 or cursor != 8:
-                raise RuntimeError("PNG 头无效")
+                raise RuntimeError("Invalid PNG header")
             width, height, depth, color, compression, filtering, interlace = struct.unpack(">IIBBBBB", content)
             if width <= 0 or height <= 0 or width * height > 16777216:
-                raise RuntimeError("PNG 像素超过脚本上限")
+                raise RuntimeError("The PNG pixel count exceeds the script limit")
             if compression or filtering or interlace:
-                raise RuntimeError("验证脚本仅支持非交错标准 PNG")
+                raise RuntimeError("The validation script supports only standard noninterlaced PNG images")
             channels = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}.get(color)
             valid_depths = {0: {1, 2, 4, 8, 16}, 2: {8, 16}, 3: {1, 2, 4, 8}, 4: {8, 16}, 6: {8, 16}}
             if channels is None or depth not in valid_depths[color]:
-                raise RuntimeError("PNG 像素格式无效")
+                raise RuntimeError("Invalid PNG pixel format")
             row_bytes = (width * depth * channels + 7) // 8
             dimensions = (width, height, row_bytes)
         elif kind == b"IDAT":
             compressed.extend(content)
         elif kind == b"IEND":
             if size or cursor + 12 != len(data):
-                raise RuntimeError("PNG 结束块无效")
+                raise RuntimeError("Invalid PNG end chunk")
             ended = True
         cursor += size + 12
     if not dimensions or not ended or not compressed:
-        raise RuntimeError("PNG 缺少必需块")
+        raise RuntimeError("The PNG is missing required chunks")
     width, height, row_bytes = dimensions
     expected = height * (row_bytes + 1)
     decoder = zlib.decompressobj()
     raw = decoder.decompress(compressed, expected + 1)
     if len(raw) != expected or not decoder.eof or decoder.unused_data:
-        raise RuntimeError("PNG 扫描行长度不符")
+        raise RuntimeError("The PNG scanline length does not match")
     if any(raw[y * (row_bytes + 1)] > 4 for y in range(height)):
-        raise RuntimeError("PNG 扫描行过滤类型无效")
+        raise RuntimeError("Invalid PNG scanline filter type")
     return width, height
 
 
@@ -138,16 +138,16 @@ def screenshot(client, gui_id, display_id, output, label):
     metadata, response = client.tool("gui_screenshot", arguments)
     images = [item for item in response.get("content", []) if item.get("type") == "image"]
     if len(images) != 1 or images[0].get("mimeType") != "image/png":
-        raise RuntimeError("截图必须返回一个标准 MCP PNG 图片块")
+        raise RuntimeError("A screenshot must return exactly one standard MCP PNG image block")
     data = base64.b64decode(images[0]["data"], validate=True)
     width, height = decode_png(data)
     # 兼容结果外层携带 capture 字段与直接返回截图元数据两种结构。
     capture = metadata.get("capture", metadata)
     for key in ("capture_id", "display_id", "region", "logical_bounds", "layout_generation", "captured_at", "captured_at_source", "frame_sequence", "freshness"):
         if key not in capture:
-            raise RuntimeError("截图缺少坐标或采集元数据：" + key)
+            raise RuntimeError("The screenshot is missing coordinate or capture metadata: " + key)
     if capture.get("width") != width or capture.get("height") != height:
-        raise RuntimeError("截图图片尺寸与结构化结果不符")
+        raise RuntimeError("The screenshot dimensions do not match the structured result")
     (output / (label + ".png")).write_bytes(data)
     (output / (label + ".json")).write_text(json.dumps(capture, ensure_ascii=False, indent=2), encoding="utf-8")
     return capture
@@ -158,19 +158,19 @@ def load_plan(path):
         return None
     plan = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(plan, dict) or not isinstance(plan.get("target"), str) or not plan["target"].strip():
-        raise RuntimeError("输入计划必须声明已准备好的专用目标 target")
+        raise RuntimeError("The input plan must declare a prepared dedicated target")
     operations = plan.get("operations")
     if not isinstance(operations, list) or not operations or len(operations) > 64:
-        raise RuntimeError("输入计划需要 1 至 64 个 operations")
+        raise RuntimeError("The input plan requires 1 to 64 operations")
     for operation in operations:
         if not isinstance(operation, dict) or operation.get("tool") not in {"gui_mouse", "gui_key", "gui_text"}:
-            raise RuntimeError("输入计划只能调用 GUI 输入工具")
+            raise RuntimeError("The input plan may call only GUI input tools")
         arguments = operation.get("arguments")
         if not isinstance(arguments, dict) or "id" in arguments or "capture_id" in arguments:
-            raise RuntimeError("输入计划 arguments 不得指定会话或截图 ID")
+            raise RuntimeError("Input plan arguments must not specify session or capture IDs")
     verification = plan.get("verify_text_file")
     if verification is not None and (not isinstance(verification, dict) or not isinstance(verification.get("path"), str) or not isinstance(verification.get("expected"), str)):
-        raise RuntimeError("verify_text_file 必须指定 path 和 expected")
+        raise RuntimeError("verify_text_file must specify path and expected")
     return plan
 
 
@@ -184,7 +184,7 @@ def fixture_points(data):
         if kind == b"IHDR":
             depth, color_type = content[8], content[9]
             if depth != 8 or color_type not in {2, 6}:
-                raise RuntimeError("专用窗口自动定位需要 RGB/RGBA 8 位截图")
+                raise RuntimeError("Automatic fixture location requires an 8-bit RGB or RGBA screenshot")
         if kind == b"IDAT":
             compressed.extend(content)
         position += size + 12
@@ -226,12 +226,12 @@ def fixture_points(data):
     centers = []
     for count, total_x, total_y in markers.values():
         if count < 64 or count > 40000:
-            raise RuntimeError("截图未完整包含专用窗口四个标记；请选择正确显示器并保持窗口可见")
+            raise RuntimeError("The screenshot does not contain all four fixture markers; select the correct display and keep the window visible")
         centers.append((total_x / count, total_y / count))
     top_left, top_right, bottom_left, bottom_right = centers
     scale_x, scale_y = (top_right[0] - top_left[0]) / 580, (bottom_left[1] - top_left[1]) / 400
     if scale_x <= 0 or scale_y <= 0 or abs(bottom_right[0] - top_right[0]) > 2 or abs(bottom_right[1] - bottom_left[1]) > 2:
-        raise RuntimeError("专用窗口标记坐标不一致，拒绝输入")
+        raise RuntimeError("The fixture marker coordinates are inconsistent; input is refused")
 
     def point(x, y):
         return {"x": top_left[0] + (x - 30) * scale_x, "y": top_left[1] + (y - 30) * scale_y}
@@ -254,7 +254,7 @@ def fixture_plan(point, allow_replace, inputs_only=False):
     if inputs_only:
         operations = [operations[0], operations[2], {"tool": "gui_key", "arguments": {"keys": ["Backspace"]}}, *operations[4:]]
         text = ""
-    return {"target": "专用原生验证窗口", "operations": operations}, text
+    return {"target": "Dedicated native validation window", "operations": operations}, text
 
 
 def fixture_verified(result, expected):
@@ -269,7 +269,7 @@ def fixture_verified(result, expected):
 def fixture_request(output, fixture, operation, baseline=None, test_hashes=None, test_closed=False, timeout_seconds=10):
     """通过专用窗口确认焦点或读取剪贴板，等待有上限。"""
     if not isinstance(timeout_seconds, (int, float)) or isinstance(timeout_seconds, bool) or not 0 < timeout_seconds <= 605:
-        raise RuntimeError("专用窗口等待须大于 0 且不超过 605 秒")
+        raise RuntimeError("Fixture wait must be greater than 0 and no more than 605 seconds")
     request_id = uuid.uuid4().hex
     request = output / "clipboard-request.json"
     temporary = request.with_suffix(".tmp")
@@ -293,13 +293,13 @@ def fixture_request(output, fixture, operation, baseline=None, test_hashes=None,
                         time.sleep(0.05)
                         continue
                     if document.get("error") in REFRESH_ERRORS | RESCUE_ERRORS:
-                        raise RuntimeError("剪贴板准备失败：" + document["error"])
-                    raise RuntimeError("剪贴板无法可靠读取或超过验证上限，默认恢复验证中止")
+                        raise RuntimeError("Clipboard preparation failed: " + document["error"])
+                    raise RuntimeError("The clipboard cannot be read reliably or exceeds the validation limit; default restoration validation is aborted")
                 return document
         time.sleep(0.05)
     if operation == "focus":
-        raise RuntimeError("专用窗口聚焦超时：请完成系统授权并保持窗口运行及可见")
-    raise RuntimeError("剪贴板操作等待超时：专用窗口须获得焦点及桌面读取许可，且保持运行")
+        raise RuntimeError("Fixture focus timed out; complete system authorization and keep the window running and visible")
+    raise RuntimeError("The clipboard operation timed out; the fixture must have focus and desktop read permission and remain running")
 
 
 def sample_clipboard(output, fixture, label, baseline=None, original_baseline=None):
@@ -307,7 +307,7 @@ def sample_clipboard(output, fixture, label, baseline=None, original_baseline=No
     summary = fixture_request(output, fixture, "clipboard")["summary"]
     (output / ("clipboard-" + label + ".json")).write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     if baseline is not None and summary != baseline:
-        raise RuntimeError("剪贴板格式、长度或哈希已变化：" + label)
+        raise RuntimeError("Clipboard formats, lengths, or hashes have changed: " + label)
     if original_baseline is not None:
         validate_original_formats(summary, original_baseline, allow_qt_alias=True)
         (output / ("clipboard-original-check-" + label + ".json")).write_text(json.dumps({"original_formats_preserved": True,
@@ -317,35 +317,35 @@ def sample_clipboard(output, fixture, label, baseline=None, original_baseline=No
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--execute", action="store_true", help="显式启用真实桌面授权、截图及可选输入")
-    parser.add_argument("--url", default="http://127.0.0.1:8080/mcp", help="已经启动的服务 MCP URL")
-    parser.add_argument("--token-file", help="凭据文件；默认使用 REMOTE_MCP_TOKEN")
-    parser.add_argument("--no-token", action="store_true", help="忽略环境 Token，使用匿名模式")
-    parser.add_argument("--ca-file", help="服务证书的受信 CA 文件")
-    parser.add_argument("--display-id", help="截图目标显示器；默认由服务选择")
-    parser.add_argument("--output-dir", default="gui-evidence", help="截图与元数据保存目录")
-    parser.add_argument("--input-plan", help="调用方准备的专用目标与输入计划 JSON，坐标相对首次截图")
-    parser.add_argument("--fixture", action="store_true", help="启动可选 PySide6 专用窗口，自动定位并核验鼠标及中文")
-    parser.add_argument("--fixture-inputs-only", action="store_true", help="仅专用窗口验证键鼠及清空固定字段；不调用文字工具或写剪贴板")
-    parser.add_argument("--allow-clipboard-replace", action="store_true", help="仅用于专用窗口，明确允许无法保存时替换剪贴板")
-    parser.add_argument("--refresh-clipboard-offer", action="store_true", help="专用窗口显式重新发布完全相同剪贴板数据，准备 Portal 初始格式通知")
-    parser.add_argument("--desktop-label", default="未注明", help="记录桌面及其版本，如 GNOME 49 Wayland")
-    parser.add_argument("--authorize-wait-seconds", type=authorize_wait, default=125, help="测试客户端授权等待上限，1至605秒；须配合服务授权期限")
+    parser.add_argument("--execute", action="store_true", help="Explicitly enable native desktop authorization, screenshots, and optional input")
+    parser.add_argument("--url", default="http://127.0.0.1:8080/mcp", help="MCP URL of an already running service")
+    parser.add_argument("--token-file", help="Credential file; defaults to REMOTE_MCP_TOKEN")
+    parser.add_argument("--no-token", action="store_true", help="Ignore the environment token and use anonymous mode")
+    parser.add_argument("--ca-file", help="Trusted CA file for the service certificate")
+    parser.add_argument("--display-id", help="Display to capture; defaults to the service selection")
+    parser.add_argument("--output-dir", default="gui-evidence", help="Directory for screenshots and metadata")
+    parser.add_argument("--input-plan", help="Caller-prepared dedicated target and input plan JSON; coordinates are relative to the first screenshot")
+    parser.add_argument("--fixture", action="store_true", help="Start the optional PySide6 fixture, locate it automatically, and verify mouse input and Chinese text")
+    parser.add_argument("--fixture-inputs-only", action="store_true", help="Verify only mouse and keyboard input and clearing the fixed fixture field; do not call text tools or write the clipboard")
+    parser.add_argument("--allow-clipboard-replace", action="store_true", help="Fixture only: explicitly allow clipboard replacement when preservation is unavailable")
+    parser.add_argument("--refresh-clipboard-offer", action="store_true", help="Explicitly republish identical clipboard data from the fixture to prepare the initial Portal format notification")
+    parser.add_argument("--desktop-label", default="Unspecified", help="Record the desktop and its version, such as GNOME 49 Wayland")
+    parser.add_argument("--authorize-wait-seconds", type=authorize_wait, default=125, help="Test client authorization wait limit, from 1 to 605 seconds; align it with the service authorization timeout")
     args = parser.parse_args()
     if not args.execute:
         parser.print_help()
-        print("\n未执行：只有 --execute 才连接桌面；普通 CI 不调用真实 GUI。")
+        print("\nNot executed: only --execute connects to the desktop; ordinary CI does not invoke native GUI operations.")
         return 0
     if args.no_token and args.token_file:
-        parser.error("--no-token 与 --token-file 不能同时指定")
+        parser.error("--no-token and --token-file cannot be used together")
     if args.fixture and args.input_plan:
-        parser.error("--fixture 与 --input-plan 不能同时指定")
+        parser.error("--fixture and --input-plan cannot be used together")
     if args.fixture_inputs_only and (not args.fixture or args.refresh_clipboard_offer or args.allow_clipboard_replace):
-        parser.error("--fixture-inputs-only 须与 --fixture 并用，不能刷新或允许替换剪贴板")
+        parser.error("--fixture-inputs-only requires --fixture and cannot refresh or allow replacement of the clipboard")
     if args.allow_clipboard_replace and not args.fixture:
-        parser.error("--allow-clipboard-replace 仅用于 --fixture；自定义计划在 gui_text 参数声明")
+        parser.error("--allow-clipboard-replace requires --fixture; custom plans declare it in gui_text arguments")
     if args.refresh_clipboard_offer and (not args.fixture or args.allow_clipboard_replace):
-        parser.error("--refresh-clipboard-offer 仅用于 --fixture 默认保留验证，不能与允许替换同时使用")
+        parser.error("--refresh-clipboard-offer requires default-preservation validation with --fixture and cannot be used with clipboard replacement")
     plan = load_plan(args.input_plan)
     token = "" if args.no_token else os.environ.get("REMOTE_MCP_TOKEN", "")
     if args.token_file:
@@ -353,17 +353,17 @@ def main():
         with token_file.open("rb") as credential:
             info = os.fstat(credential.fileno())
             if not stat.S_ISREG(info.st_mode) or info.st_size > 8192:
-                raise RuntimeError("凭据文件必须是不超过 8 KiB 的普通文件")
+                raise RuntimeError("The credential file must be a regular file no larger than 8 KiB")
             if os.name != "nt" and info.st_mode & 0o077:
-                raise RuntimeError("凭据文件须仅当前账号可读")
+                raise RuntimeError("The credential file must be readable only by the current account")
             contents = credential.read(8193)
             if len(contents) > 8192:
-                raise RuntimeError("凭据文件超过 8 KiB")
+                raise RuntimeError("The credential file exceeds 8 KiB")
             token = contents.decode("utf-8").strip()
         if not token:
-            raise RuntimeError("显式凭据文件不能为空")
+            raise RuntimeError("An explicit credential file must not be empty")
     if token and (len(token) > 8192 or any(ord(character) < 33 or ord(character) > 126 for character in token)):
-        raise RuntimeError("Token 格式无效")
+        raise RuntimeError("Invalid token format")
     output = Path(args.output_dir).resolve()
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
     client = Client(args.url, token, args.ca_file)
@@ -377,17 +377,17 @@ def main():
     close_confirmed = False
     primary_failure = None
     report = {"acceptance_complete": False, "run_completed": False, "platform": platform.platform(), "desktop": args.desktop_label,
-              "checks": [], "submitted_operations": [], "pending": ["五类真实桌面分别验收", "实际 MCP 客户端图片展示", "多屏混合缩放、布局变化", "剪贴板恢复与竞争、撤销和断线"]}
+              "checks": [], "submitted_operations": [], "pending": ["Validate all five native desktop environments separately", "Verify image display in an actual MCP client", "Validate multiple displays, mixed scaling, and layout changes", "Validate clipboard restoration and ownership races, authorization revocation, and disconnection"]}
     try:
         initialized = client.rpc("initialize", {"protocolVersion": "2025-11-25", "capabilities": {},
                                                 "clientInfo": {"name": "independent-gui-smoke", "version": "1"}})
         if initialized.get("protocolVersion") != "2025-11-25":
-            raise RuntimeError("MCP 协议版本不符")
+            raise RuntimeError("The MCP protocol version does not match")
         client.rpc("notifications/initialized", {}, notification=True)
         names = {item["name"] for item in client.rpc("tools/list", {}).get("tools", [])}
         if not GUI_TOOLS <= names:
-            raise RuntimeError("GUI 工具注册不完整")
-        report["checks"].append("独立 JSON-RPC 初始化和七个 GUI 工具发现")
+            raise RuntimeError("GUI tool registration is incomplete")
+        report["checks"].append("Independent JSON-RPC initialization and discovery of all seven GUI tools")
         client.tool("gui_status", {})
         if args.fixture:
             environment = os.environ.copy()
@@ -402,13 +402,13 @@ def main():
             while not (output / "fixture.json").exists() and time.monotonic() < deadline and fixture.poll() is None:
                 time.sleep(0.1)
             if not (output / "fixture.json").exists():
-                raise RuntimeError("专用窗口无法启动，请安装可选验证依赖 PySide6 并核对桌面")
+                raise RuntimeError("The fixture could not start; install the optional PySide6 validation dependency and check the desktop session")
             if args.fixture_inputs_only:
                 initial = json.loads((output / "fixture.json").read_text(encoding="utf-8"))
                 if initial.get("text") != "组合键验证":
-                    raise RuntimeError("仅键鼠窗口缺少固定初始字段，不能核验实际清空")
+                    raise RuntimeError("The input-only fixture is missing its fixed initial field; actual clearing cannot be verified")
                 report["fixture_inputs_only"] = True
-                report["pending"].append("本次未调用 gui_text；中文实际输入及默认剪贴板恢复待验收")
+                report["pending"].append("gui_text was not called in this run; actual Chinese text input and default clipboard restoration remain pending")
             elif not args.allow_clipboard_replace:
                 clipboard_baseline = sample_clipboard(output, fixture, "baseline")
         opened, _ = client.tool("gui_open", {"request_id": "gui-smoke-" + uuid.uuid4().hex, "wait_ms": 10000})
@@ -418,7 +418,7 @@ def main():
             time.sleep(1)
             opened, _ = client.tool("gui_status", {"id": gui_id})
         if opened.get("state") != "ready":
-            raise RuntimeError("图形会话未进入 ready，需核对目标机授权")
+            raise RuntimeError("The GUI session did not enter ready state; check authorization on the target machine")
         if fixture is not None:
             # Portal ready之后仍可能有系统模态许可；先等待窗口焦点，再定位或准备剪贴板。
             fixture_request(output, fixture, "focus", timeout_seconds=args.authorize_wait_seconds)
@@ -431,7 +431,7 @@ def main():
             refreshed = sample_clipboard(output, fixture, "after-refresh", original_baseline=original_clipboard_baseline)
             alias_added = validate_original_formats(refreshed, original_clipboard_baseline, allow_qt_alias=True)
             clipboard_baseline = refreshed
-            report["checks"].append("原格式字节摘要一致；" + ("新增 Qt 派生 charset 别名" if alias_added else "无新增格式") + "；未允许替换")
+            report["checks"].append("Original format byte digests match; " + ("a Qt-derived charset alias was added" if alias_added else "no formats were added") + "; replacement was not allowed")
             report["qt_derived_alias_added"] = alias_added
             report["clipboard_offer_refreshed"] = True
             # 让 Portal 异步格式通知抵达服务；有界等待后仍由默认保护作最终判断。
@@ -439,18 +439,18 @@ def main():
             while time.monotonic() < offer_deadline:
                 status, _ = client.tool("gui_status", {"id": gui_id})
                 reason = status.get("capabilities", {}).get("reasons", {}).get("text", "")
-                if "尚未提供当前剪贴板格式" not in reason:
+                if "has not provided the current clipboard formats" not in reason:
                     break
                 time.sleep(0.05)
         capture = screenshot(client, gui_id, args.display_id, output, "before")
-        report["checks"].append("标准 MCP 图片、PNG 扫描行、坐标与采集元数据")
+        report["checks"].append("Standard MCP image, PNG scanlines, coordinates, and capture metadata")
         if args.fixture:
             point = fixture_points((output / "before.png").read_bytes())
             plan, fixture_expected = fixture_plan(point, args.allow_clipboard_replace, inputs_only=args.fixture_inputs_only)
         if plan:
             verification = plan.get("verify_text_file")
             if verification and Path(verification["path"]).exists():
-                raise RuntimeError("文字验收文件必须事先不存在，避免读取旧产物")
+                raise RuntimeError("The text validation file must not exist before the run, to avoid reading a stale artifact")
             for index, operation in enumerate(plan["operations"]):
                 if fixture is not None:
                     fixture_request(output, fixture, "focus")
@@ -466,7 +466,7 @@ def main():
                                                        "mode": result.get("mode"), "clipboard_restore": result.get("clipboard_restore")})
                 if operation["tool"] == "gui_text" and clipboard_baseline is not None:
                     sample_clipboard(output, fixture, "after-text-" + str(index + 1), clipboard_baseline, original_clipboard_baseline)
-                    report["checks"].append("文本输入后原剪贴板各格式长度和哈希一致")
+                    report["checks"].append("Original clipboard format lengths and hashes match after text input")
                 screenshot(client, gui_id, args.display_id, output, "after-" + str(index + 1))
             if verification:
                 evidence = Path(verification["path"])
@@ -474,10 +474,10 @@ def main():
                 while not evidence.exists() and time.monotonic() < deadline:
                     time.sleep(0.1)
                 if evidence.stat().st_size > 1024 * 1024 or evidence.read_text(encoding="utf-8") != verification["expected"]:
-                    raise RuntimeError("目标应用保存的 UTF-8 内容与预期不符")
-                report["checks"].append("目标应用实际保存的 UTF-8 文本与预期一致")
+                    raise RuntimeError("The UTF-8 content saved by the target application does not match the expected content")
+                report["checks"].append("The UTF-8 text actually saved by the target application matches the expected content")
             elif not args.fixture:
-                report["pending"].append("输入仅核对事件结果；目标应用文字与鼠标行为需人工检查")
+                report["pending"].append("Only input event submission was checked; target application text and mouse behavior require manual verification")
             if args.fixture:
                 deadline = time.monotonic() + 5
                 while True:
@@ -487,16 +487,16 @@ def main():
                         break
                     time.sleep(0.1)
                 if not complete:
-                    raise RuntimeError("专用窗口实际鼠标事件或中文内容未通过核验")
+                    raise RuntimeError("Actual mouse events or Chinese text in the fixture failed validation")
                 if (os.environ.get("XDG_SESSION_TYPE") == "wayland" or os.environ.get("WAYLAND_DISPLAY")) and fixture_result["platform"] != "wayland":
-                    raise RuntimeError("Wayland 原生验收不能用 XWayland 窗口替代")
+                    raise RuntimeError("Native Wayland validation cannot use an XWayland window as a substitute")
                 if args.fixture_inputs_only:
-                    report["checks"].append("仅键鼠：原生窗口点击、双击、拖拽、滚动、全选及删除组合键，密码回显字段实际清空；测试未调用剪贴板读写或选区复制")
+                    report["checks"].append("Mouse and keyboard only: native window clicks, double-clicks, dragging, scrolling, select-all and deletion keys cleared the password-echo field; the test did not read or write the clipboard or copy selections")
                 else:
-                    report["checks"].append("原生专用窗口的点击、双击、拖拽、滚动、全选组合键和实际中文内容")
+                    report["checks"].append("Clicks, double-clicks, dragging, scrolling, select-all shortcuts, and actual Chinese text in the native fixture")
                 report["fixture_platform"] = fixture_result["platform"]
         else:
-            report["pending"].append("未提供输入计划，鼠标键盘与中文实际输入待验证")
+            report["pending"].append("No input plan was provided; actual mouse, keyboard, and Chinese text input remain pending")
         report["run_completed"] = True
     except Exception as error:
         primary_failure = error
@@ -508,12 +508,12 @@ def main():
                 closed, _ = client.tool("gui_close", {"id": gui_id})
                 again, _ = client.tool("gui_close", {"id": gui_id})
                 if closed.get("state") != "closed" or again.get("state") != "closed":
-                    raise RuntimeError("图形会话未可靠关闭")
+                    raise RuntimeError("The GUI session was not reliably closed")
                 close_confirmed = True
-                report["checks"].append("图形会话关闭和重复关闭")
+                report["checks"].append("GUI session close and repeated close")
                 if clipboard_baseline is not None:
                     sample_clipboard(output, fixture, "after-close", clipboard_baseline, original_clipboard_baseline)
-                    report["checks"].append("图形会话关闭后原剪贴板各格式仍可读取且哈希一致")
+                    report["checks"].append("All original clipboard formats remain readable with matching hashes after the GUI session closes")
         except Exception as error:
             report["run_completed"] = False
             report.setdefault("cleanup_failures", []).append(str(error) if isinstance(error, RuntimeError) else type(error).__name__)
@@ -537,7 +537,7 @@ def main():
                         if retain_fixture:
                             report["fixture_retained"] = True
                             report["fixture_pid"] = fixture.pid
-                            report["pending"].append("验证窗口保留有界原剪贴板内存备份；请用户确认恢复后再关闭")
+                            report["pending"].append("The fixture retains a bounded in-memory backup of the original clipboard; confirm restoration before closing it")
                     if not retain_fixture:
                         if fixture.poll() is None:
                             fixture.terminate()
@@ -563,5 +563,5 @@ if __name__ == "__main__":
         sys.exit(main())
     except Exception as error:
         # 不输出 traceback，避免参数、图片、输入计划及凭据意外进入日志。
-        print("GUI 验证失败：" + (str(error) if isinstance(error, RuntimeError) else type(error).__name__), file=sys.stderr)
+        print("GUI validation failed: " + (str(error) if isinstance(error, RuntimeError) else type(error).__name__), file=sys.stderr)
         sys.exit(1)

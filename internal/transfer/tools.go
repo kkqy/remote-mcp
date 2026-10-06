@@ -18,12 +18,12 @@ func register[I any](s *mcp.Server, name, description string, fn func(context.Co
 	})
 }
 func (m *Manager) Register(s *mcp.Server) {
-	register(s, "file_stat", "查询普通文件大小", m.Stat)
-	register(s, "upload_create", "创建顺序分块上传；request_id 用于有界幂等；默认禁止覆盖", m.UploadCreate)
-	register(s, "upload_write", "写入 Base64 分块；offset 为原始字节偏移", m.UploadWrite)
-	register(s, "upload_finish", "校验长度与 SHA-256 后发布文件", m.UploadFinish)
-	register(s, "upload_cancel", "取消上传并清理临时文件", m.UploadCancel)
-	register(s, "download_open", "打开普通文件并流式计算 SHA-256", m.DownloadOpen)
-	register(s, "download_read", "按原始字节偏移读取 Base64 分块", m.DownloadRead)
-	register(s, "download_close", "检查源文件变化并释放下载句柄", m.DownloadClose)
+	register(s, "file_stat", "Query the size of a regular file", m.Stat)
+	register(s, "upload_create", "Create a sequential chunked upload; request_id provides bounded idempotency; overwriting is disabled by default", m.UploadCreate)
+	register(s, "upload_write", "Write a Base64 chunk; offset is the raw byte offset", m.UploadWrite)
+	register(s, "upload_finish", "Publish the file after validating its length and SHA-256", m.UploadFinish)
+	register(s, "upload_cancel", "Cancel an upload and remove its temporary file", m.UploadCancel)
+	register(s, "download_open", "Open a regular file and compute its SHA-256 using streaming reads", m.DownloadOpen)
+	register(s, "download_read", "Read a Base64 chunk at the raw byte offset", m.DownloadRead)
+	register(s, "download_close", "Check for source file changes and release the download handle", m.DownloadClose)
 }

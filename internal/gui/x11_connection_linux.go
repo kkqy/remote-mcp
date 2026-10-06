@@ -54,7 +54,7 @@ func writeAll(w io.Writer, data []byte) (int, error) {
 func x11Address(display string) (network, address, host, number string, screen int, err error) {
 	colon := strings.LastIndex(display, ":")
 	if colon < 0 {
-		err = errors.New("无效显示器")
+		err = errors.New("Invalid display")
 		return
 	}
 	host = display[:colon]
@@ -62,17 +62,17 @@ func x11Address(display string) (network, address, host, number string, screen i
 	number = suffix[0]
 	n, e := strconv.Atoi(number)
 	if e != nil || n < 0 || n > 59535 {
-		err = errors.New("无效显示器")
+		err = errors.New("Invalid display")
 		return
 	}
 	if len(suffix) > 2 {
-		err = errors.New("无效屏幕编号")
+		err = errors.New("Invalid screen number")
 		return
 	}
 	if len(suffix) == 2 {
 		screen, e = strconv.Atoi(suffix[1])
 		if e != nil || screen < 0 || screen > 255 {
-			err = errors.New("无效屏幕编号")
+			err = errors.New("Invalid screen number")
 			return
 		}
 	}
@@ -112,7 +112,7 @@ func x11Cookie(host, number string) ([]byte, error) {
 	defer file.Close()
 	info, err := file.Stat()
 	if err != nil || !info.Mode().IsRegular() || info.Size() > 1<<20 {
-		return nil, errors.New("认证文件不可读取")
+		return nil, errors.New("Unable to read the authentication file")
 	}
 	reader := io.LimitReader(file, 1<<20)
 	hostname, _ := os.Hostname()
@@ -177,11 +177,11 @@ func x11Handshake(cookie []byte) []byte {
 func x11ConnectTransport(ctx context.Context, display string) (*xgb.Conn, net.Conn, error) {
 	network, address, host, number, screen, err := x11Address(display)
 	if err != nil {
-		return nil, nil, failure("no_gui", "X11 显示器地址无效")
+		return nil, nil, failure("no_gui", "Invalid X11 display address")
 	}
 	raw, err := (&net.Dialer{}).DialContext(ctx, network, address)
 	if err != nil {
-		return nil, nil, failure("permission_denied", "无法连接当前 X11 显示服务器")
+		return nil, nil, failure("permission_denied", "Unable to connect to the current X11 display server")
 	}
 	cookie, err := x11Cookie(host, number)
 	if err == nil && len(cookie) == 0 && network == "tcp" {
@@ -191,7 +191,7 @@ func x11ConnectTransport(ctx context.Context, display string) (*xgb.Conn, net.Co
 	}
 	if err != nil {
 		_ = raw.Close()
-		return nil, nil, failure("permission_denied", "当前显示器的 Xauthority 无法读取")
+		return nil, nil, failure("permission_denied", "Unable to read Xauthority for the current display")
 	}
 
 	if deadline, ok := ctx.Deadline(); ok {
@@ -202,14 +202,14 @@ func x11ConnectTransport(ctx context.Context, display string) (*xgb.Conn, net.Co
 	conn, err := safeX11Connection(&x11AuthConn{Conn: raw, auth: x11Handshake(cookie)})
 	if err != nil {
 		_ = raw.Close()
-		return nil, nil, failure("permission_denied", "X11 显示服务器认证失败")
+		return nil, nil, failure("permission_denied", "X11 display server authentication failed")
 	}
 	conn.DefaultScreen = screen
 	conn.DisplayNumber, _ = strconv.Atoi(number)
 	if len(conn.SetupBytes) < 40 || screen >= int(conn.SetupBytes[28]) {
 		conn.Close()
 		_ = raw.Close()
-		return nil, nil, failure("no_gui", "X11 屏幕编号不存在")
+		return nil, nil, failure("no_gui", "X11 screen number does not exist")
 	}
 	if ctx.Err() != nil {
 		conn.Close()
@@ -241,7 +241,7 @@ func safeX11Connection(transport net.Conn) (conn *xgb.Conn, err error) {
 		if recover() != nil {
 			_ = transport.Close()
 			conn = nil
-			err = failure("no_gui", "X11 握手响应格式无效")
+			err = failure("no_gui", "Invalid X11 handshake response")
 		}
 	}()
 	return xgb.NewConnNet(transport)

@@ -49,7 +49,7 @@ type x11Selection struct {
 
 func (b *x11Backend) connect(ctx context.Context) (*x11Desktop, error) {
 	if os.Getenv("DISPLAY") == "" {
-		return nil, failure("no_gui", "当前用户没有可访问的图形显示器")
+		return nil, failure("no_gui", "The current user has no accessible graphical display")
 	}
 	conn, raw, err := x11ConnectTransport(ctx, os.Getenv("DISPLAY"))
 	if err != nil {
@@ -81,27 +81,27 @@ func (b *x11Backend) connect(ctx context.Context) (*x11Desktop, error) {
 	d.caps.Clipboard = d.caps.Keyboard
 	d.caps.Text = d.caps.Keyboard
 	if !d.caps.Keyboard {
-		d.caps.Reasons["keyboard"] = "XTEST 扩展不可用"
-		d.caps.Reasons["mouse"] = "XTEST 扩展不可用"
-		d.caps.Reasons["text"] = "XTEST 扩展不可用"
+		d.caps.Reasons["keyboard"] = "The XTEST extension is unavailable"
+		d.caps.Reasons["mouse"] = "The XTEST extension is unavailable"
+		d.caps.Reasons["text"] = "The XTEST extension is unavailable"
 	}
 	for _, name := range []string{"CLIPBOARD", "CLIPBOARD_MANAGER", "SAVE_TARGETS", "TARGETS", "UTF8_STRING", "TEXT", "STRING", "INCR", "REMOTE_MCP_SELECTION"} {
 		r, err := xproto.InternAtom(conn, false, uint16(len(name)), name).Reply()
 		if err != nil {
 			conn.Close()
-			return nil, failure("no_gui", "X11 剪贴板初始化失败")
+			return nil, failure("no_gui", "Failed to initialize the X11 clipboard")
 		}
 		d.atoms[name] = r.Atom
 	}
 	window, err := xproto.NewWindowId(conn)
 	if err != nil {
 		conn.Close()
-		return nil, failure("no_gui", "X11 窗口句柄创建失败")
+		return nil, failure("no_gui", "Failed to create an X11 window handle")
 	}
 	d.window = window
 	if err := xproto.CreateWindowChecked(conn, 0, window, screen.Root, 0, 0, 1, 1, 0, xproto.WindowClassInputOnly, 0, 0, nil).Check(); err != nil {
 		conn.Close()
-		return nil, failure("no_gui", "X11 剪贴板窗口创建失败")
+		return nil, failure("no_gui", "Failed to create the X11 clipboard window")
 	}
 	go d.events()
 	return d, nil
@@ -126,7 +126,7 @@ func (d *x11Desktop) Err() error {
 	if d.healthErr != nil {
 		return d.healthErr
 	}
-	return failure("session_closed", "X11 显示连接已关闭")
+	return failure("session_closed", "X11 display connection is closed")
 }
 func (d *x11Desktop) check(ctx context.Context) error {
 	if ctx.Err() != nil {
@@ -135,7 +135,7 @@ func (d *x11Desktop) check(ctx context.Context) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.closed {
-		return failure("session_closed", "X11 显示连接已关闭")
+		return failure("session_closed", "X11 display connection is closed")
 	}
 	return nil
 }
@@ -145,7 +145,7 @@ func (d *x11Desktop) events() {
 		if err != nil || event == nil {
 			d.mu.Lock()
 			d.closed = true
-			d.healthErr = failure("session_closed", "X11 显示连接已断开")
+			d.healthErr = failure("session_closed", "X11 display connection was disconnected")
 			d.mu.Unlock()
 			d.once.Do(func() { close(d.done) })
 			return
@@ -172,7 +172,7 @@ func (d *x11Desktop) Displays(ctx context.Context) ([]Display, error) {
 		return nil, err
 	}
 	makeDisplay := func(id string, x, y, w, h int, primary bool) Display {
-		return Display{ID: id, Name: "X11 显示器", Primary: primary, PixelWidth: w, PixelHeight: h, LogicalBounds: Bounds{float64(x), float64(y), float64(w), float64(h)}, AbsoluteInput: true}
+		return Display{ID: id, Name: "X11 display", Primary: primary, PixelWidth: w, PixelHeight: h, LogicalBounds: Bounds{float64(x), float64(y), float64(w), float64(h)}, AbsoluteInput: true}
 	}
 	var displays []Display
 	if d.randr {
@@ -198,7 +198,7 @@ func (d *x11Desktop) Displays(ctx context.Context) ([]Display, error) {
 	if len(displays) == 0 {
 		geometry, err := xproto.GetGeometry(d.conn, xproto.Drawable(d.screen.Root)).Reply()
 		if err != nil {
-			return nil, failure("no_gui", "无法读取 X11 显示器尺寸")
+			return nil, failure("no_gui", "Unable to read X11 display dimensions")
 		}
 		displays = append(displays, makeDisplay("root", 0, 0, int(geometry.Width), int(geometry.Height), true))
 	}
@@ -214,7 +214,7 @@ func x11Decode(reply *xproto.GetImageReply, setup *xproto.SetupInfo, screen *xpr
 		}
 	}
 	if format.BitsPerPixel != 16 && format.BitsPerPixel != 24 && format.BitsPerPixel != 32 || format.ScanlinePad == 0 {
-		return nil, failure("unsupported", "X11 像素格式不支持")
+		return nil, failure("unsupported", "Unsupported X11 pixel format")
 	}
 	var visual xproto.VisualInfo
 	for _, depth := range screen.AllowedDepths {
@@ -225,11 +225,11 @@ func x11Decode(reply *xproto.GetImageReply, setup *xproto.SetupInfo, screen *xpr
 		}
 	}
 	if visual.RedMask == 0 || visual.GreenMask == 0 || visual.BlueMask == 0 {
-		return nil, failure("unsupported", "X11 非 TrueColor 视觉格式不支持")
+		return nil, failure("unsupported", "X11 visuals other than TrueColor are unsupported")
 	}
 	stride := ((w*int(format.BitsPerPixel) + int(format.ScanlinePad) - 1) / int(format.ScanlinePad)) * int(format.ScanlinePad) / 8
 	if len(reply.Data) < stride*h {
-		return nil, failure("capture_failed", "X11 像素数据长度不足")
+		return nil, failure("capture_failed", "X11 pixel data is too short")
 	}
 	img := image.NewRGBA(image.Rect(0, 0, w, h))
 	channels := func(v, mask uint32) uint8 {
@@ -267,12 +267,12 @@ func (d *x11Desktop) Capture(ctx context.Context, display Display) (Frame, error
 	}
 	x, y := int(display.LogicalBounds.X), int(display.LogicalBounds.Y)
 	if x < -32768 || x > 32767 || y < -32768 || y > 32767 || display.PixelWidth > 65535 || display.PixelHeight > 65535 {
-		return Frame{}, failure("unsupported", "显示器坐标超过 X11 协议范围")
+		return Frame{}, failure("unsupported", "Display coordinates exceed the X11 protocol range")
 	}
 	reply, err := xproto.GetImage(d.conn, xproto.ImageFormatZPixmap, xproto.Drawable(d.screen.Root), int16(x), int16(y), uint16(display.PixelWidth), uint16(display.PixelHeight), 0xffffffff).Reply()
 	captured := time.Now()
 	if err != nil {
-		return Frame{}, failure("capture_failed", "X11 截图失败")
+		return Frame{}, failure("capture_failed", "X11 screenshot capture failed")
 	}
 	img, err := x11Decode(reply, d.setup, d.screen, display.PixelWidth, display.PixelHeight)
 	if err != nil {
@@ -295,7 +295,7 @@ func (d *x11Desktop) fake(ctx context.Context, kind, detail byte, x, y int16) er
 		d.held[uint16(kind)<<8|uint16(detail)] = true
 	}
 	if err := xtest.FakeInputChecked(d.conn, kind, detail, 0, d.screen.Root, x, y, 0).Check(); err != nil {
-		return failure("input_failed", "XTEST 事件提交失败")
+		return failure("input_failed", "Failed to submit an XTEST event")
 	}
 	if kind == xproto.KeyRelease || kind == xproto.ButtonRelease {
 		delete(d.held, uint16(kind-1)<<8|uint16(detail))
@@ -306,7 +306,7 @@ func (d *x11Desktop) Mouse(ctx context.Context, ev MouseEvent) error {
 	return performMouse(ctx, ev, func(ctx context.Context, p Point) error {
 		x, y := p.X+ev.Display.LogicalBounds.X, p.Y+ev.Display.LogicalBounds.Y
 		if x < -32768 || x > 32767 || y < -32768 || y > 32767 {
-			return failure("invalid_argument", "鼠标点超出 X11 协议范围")
+			return failure("invalid_argument", "Mouse coordinates exceed the X11 protocol range")
 		}
 		return d.fake(ctx, xproto.MotionNotify, 0, int16(x), int16(y))
 	}, func(ctx context.Context, name string, down bool) error {
@@ -346,7 +346,7 @@ func (d *x11Desktop) Key(ctx context.Context, keys []string) error {
 	}
 	mapping, err := xproto.GetKeyboardMapping(d.conn, d.setup.MinKeycode, byte(int(d.setup.MaxKeycode)-int(d.setup.MinKeycode)+1)).Reply()
 	if err != nil || mapping.KeysymsPerKeycode == 0 || len(mapping.Keysyms)%int(mapping.KeysymsPerKeycode) != 0 {
-		return failure("input_failed", "无法读取可靠 X11 键图")
+		return failure("input_failed", "Unable to read a reliable X11 keyboard map")
 	}
 	codes := map[string]byte{}
 	for name, symbol := range symbols {
@@ -357,7 +357,7 @@ func (d *x11Desktop) Key(ctx context.Context, keys []string) error {
 			}
 		}
 		if codes[name] == 0 {
-			return failure("unsupported", "当前 X11 键图缺少所需按键")
+			return failure("unsupported", "The current X11 keyboard map does not contain the requested key")
 		}
 	}
 	return performKeys(ctx, keys, func(ctx context.Context, key string, down bool) error {
@@ -379,7 +379,7 @@ func (d *x11Desktop) selection(ctx context.Context, selection, target xproto.Ato
 	}
 empty:
 	if err := xproto.ConvertSelectionChecked(d.conn, d.window, selection, target, d.atoms["REMOTE_MCP_SELECTION"], xproto.TimeCurrentTime).Check(); err != nil {
-		return x11Selection{}, failure("clipboard_preservation_unavailable", "X11 剪贴板转换失败")
+		return x11Selection{}, failure("clipboard_preservation_unavailable", "X11 clipboard conversion failed")
 	}
 	for {
 		select {
@@ -390,15 +390,15 @@ empty:
 				continue
 			}
 			if ev.Property == 0 {
-				return x11Selection{}, failure("clipboard_preservation_unavailable", "X11 剪贴板格式不可保存")
+				return x11Selection{}, failure("clipboard_preservation_unavailable", "The X11 clipboard format cannot be preserved")
 			}
 			prop, err := xproto.GetProperty(d.conn, true, d.window, ev.Property, xproto.GetPropertyTypeAny, 0, uint32((d.cfg.MaxClipboardBytes+3)/4)).Reply()
 			if err != nil || prop.BytesAfter != 0 || prop.Type == d.atoms["INCR"] || len(prop.Value) > d.cfg.MaxClipboardBytes {
-				return x11Selection{}, failure("clipboard_preservation_unavailable", "X11 剪贴板数据超限或需要增量传输")
+				return x11Selection{}, failure("clipboard_preservation_unavailable", "X11 clipboard data exceeds the limit or requires incremental transfer")
 			}
 			return x11Selection{prop.Type, prop.Format, prop.Value}, nil
 		case <-d.done:
-			return x11Selection{}, failure("session_closed", "X11 连接已关闭")
+			return x11Selection{}, failure("session_closed", "X11 connection is closed")
 		}
 	}
 }
@@ -447,7 +447,7 @@ func (d *x11Desktop) serve(ev xproto.SelectionRequestEvent) {
 func (d *x11Desktop) snapshot(ctx context.Context) (map[xproto.Atom]x11Selection, xproto.Window, error) {
 	original, err := d.owner()
 	if err != nil {
-		return nil, 0, failure("clipboard_preservation_unavailable", "X11 剪贴板所有者不可查询")
+		return nil, 0, failure("clipboard_preservation_unavailable", "Unable to query the X11 clipboard owner")
 	}
 	if original == 0 {
 		return map[xproto.Atom]x11Selection{}, 0, nil
@@ -455,11 +455,11 @@ func (d *x11Desktop) snapshot(ctx context.Context) (map[xproto.Atom]x11Selection
 	// 有内容时需要剪贴板管理器接管恢复内容，避免会话关闭后原内容丢失。
 	manager, err := xproto.GetSelectionOwner(d.conn, d.atoms["CLIPBOARD_MANAGER"]).Reply()
 	if err != nil || manager.Owner == 0 {
-		return nil, original, failure("clipboard_preservation_unavailable", "可靠恢复非空 X11 剪贴板需要 CLIPBOARD_MANAGER")
+		return nil, original, failure("clipboard_preservation_unavailable", "Reliable restoration of a nonempty X11 clipboard requires CLIPBOARD_MANAGER")
 	}
 	targets, err := d.selection(ctx, d.atoms["CLIPBOARD"], d.atoms["TARGETS"])
 	if err != nil || targets.format != 32 || len(targets.data)%4 != 0 || len(targets.data)/4 > 64 {
-		return nil, original, failure("clipboard_preservation_unavailable", "X11 剪贴板格式清单不可保存")
+		return nil, original, failure("clipboard_preservation_unavailable", "The X11 clipboard format list cannot be preserved")
 	}
 	out := map[xproto.Atom]x11Selection{}
 	remaining := d.cfg.MaxClipboardBytes
@@ -474,13 +474,13 @@ func (d *x11Desktop) snapshot(ctx context.Context) (map[xproto.Atom]x11Selection
 		}
 		remaining -= len(data.data)
 		if remaining < 0 {
-			return nil, original, failure("clipboard_preservation_unavailable", "X11 剪贴板快照总量超限")
+			return nil, original, failure("clipboard_preservation_unavailable", "The X11 clipboard snapshot exceeds the total byte limit")
 		}
 		out[target] = data
 	}
 	current, err := d.owner()
 	if err != nil || current != original {
-		return nil, original, failure("clipboard_preservation_unavailable", "保存时 X11 剪贴板所有者发生改变")
+		return nil, original, failure("clipboard_preservation_unavailable", "The X11 clipboard owner changed during preservation")
 	}
 	return out, original, nil
 }
@@ -517,7 +517,7 @@ func (d *x11Desktop) Text(ctx context.Context, in TextInput) (out InputResult, e
 	deadlineDone := d.protocolDeadline(ctx)
 	defer deadlineDone()
 	if in.Mode != "clipboard" {
-		return out, failure("unsupported", "X11 当前后端使用剪贴板文本输入")
+		return out, failure("unsupported", "The current X11 backend uses clipboard text input")
 	}
 	if len(in.PasteKeys) == 0 {
 		in.PasteKeys = []string{"Ctrl", "V"}
@@ -534,7 +534,7 @@ func (d *x11Desktop) Text(ctx context.Context, in TextInput) (out InputResult, e
 	if !preserve {
 		owner, err = d.owner()
 		if err != nil {
-			return out, failure("input_failed", "X11 剪贴板所有者查询失败")
+			return out, failure("input_failed", "Failed to query the X11 clipboard owner")
 		}
 		out.ClipboardReplaced = true
 		out.ClipboardRestore = "not_requested"
@@ -551,7 +551,7 @@ cleared:
 	data := map[xproto.Atom]x11Selection{d.atoms["UTF8_STRING"]: {d.atoms["UTF8_STRING"], 8, []byte(in.Text)}, d.atoms["TEXT"]: {d.atoms["UTF8_STRING"], 8, []byte(in.Text)}}
 	changed, e := d.setSelection(data, owner)
 	if e != nil || !changed {
-		return out, failure("clipboard_preservation_unavailable", "X11 剪贴板替换失败或所有者已变化")
+		return out, failure("clipboard_preservation_unavailable", "X11 clipboard replacement failed or its owner changed")
 	}
 	defer func() {
 		if !preserve {
@@ -562,7 +562,7 @@ cleared:
 		changed, e := d.setSelection(old, d.window)
 		if e != nil {
 			out.ClipboardRestore = "failed"
-			err = &Error{Code: "clipboard_restore_failed", Message: "原 X11 剪贴板恢复失败", InputMayHaveApplied: out.Submitted, ClipboardRestore: "failed"}
+			err = &Error{Code: "clipboard_restore_failed", Message: "Failed to restore the original X11 clipboard", InputMayHaveApplied: out.Submitted, ClipboardRestore: "failed"}
 			return
 		}
 		if !changed {
@@ -572,7 +572,7 @@ cleared:
 		if len(old) > 0 {
 			if _, e := d.selection(cleanup, d.atoms["CLIPBOARD_MANAGER"], d.atoms["SAVE_TARGETS"]); e != nil {
 				out.ClipboardRestore = "failed"
-				err = &Error{Code: "clipboard_restore_failed", Message: "X11 剪贴板管理器未接管恢复内容", InputMayHaveApplied: out.Submitted, ClipboardRestore: "failed"}
+				err = &Error{Code: "clipboard_restore_failed", Message: "The X11 clipboard manager did not take ownership of the restored content", InputMayHaveApplied: out.Submitted, ClipboardRestore: "failed"}
 				return
 			}
 		}
@@ -587,7 +587,7 @@ cleared:
 	case <-ctx.Done():
 		return out, partialError(contextError(ctx))
 	case <-d.done:
-		return out, partialError(failure("session_closed", "X11 连接已关闭"))
+		return out, partialError(failure("session_closed", "X11 connection is closed"))
 	}
 	if err := pause(ctx, 100*time.Millisecond); err != nil {
 		return out, partialError(err)
@@ -631,7 +631,7 @@ func (d *x11Desktop) Close() error {
 	d.conn.Close()
 	d.once.Do(func() { close(d.done) })
 	if cleanupErr != nil {
-		return failure("input_failed", "X11 连接失效后未能确认按键及按钮释放")
+		return failure("input_failed", "Unable to confirm key and button release after the X11 connection failed")
 	}
 	return nil
 }
@@ -640,11 +640,11 @@ func safeX11Setup(conn *xgb.Conn) (setup *xproto.SetupInfo, err error) {
 	defer func() {
 		if recover() != nil {
 			setup = nil
-			err = failure("no_gui", "X11 显示器初始化响应格式无效")
+			err = failure("no_gui", "Invalid X11 display initialization response")
 		}
 	}()
 	if len(conn.SetupBytes) < 40 {
-		return nil, failure("no_gui", "X11 显示器初始化响应过短")
+		return nil, failure("no_gui", "X11 display initialization response is too short")
 	}
 	return xproto.Setup(conn), nil
 }

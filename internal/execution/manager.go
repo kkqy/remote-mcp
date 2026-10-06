@@ -36,7 +36,7 @@ type Manager struct {
 
 func New(cfg Config) (*Manager, error) {
 	if cfg.DefaultTimeout <= 0 || cfg.TerminalIdleTimeout <= 0 || cfg.Retention <= 0 || cfg.MaxProcesses <= 0 || cfg.MaxTerminals <= 0 || cfg.OutputBytes < 2 || cfg.ReadBytes <= 0 || cfg.SweepInterval <= 0 {
-		return nil, failure("invalid_argument", "执行资源配置必须为正数，输出缓冲至少为2字节")
+		return nil, failure("invalid_argument", "Execution resource settings must be positive and the output buffer must be at least 2 bytes")
 	}
 	m := &Manager{cfg: cfg, resources: map[string]*resource{}, requests: map[string]*resource{}, stop: make(chan struct{}), sweeperDone: make(chan struct{}), closeDone: make(chan struct{})}
 	go m.sweep()
@@ -46,16 +46,16 @@ func digest(v any) [32]byte       { b, _ := json.Marshal(v); return sha256.Sum25
 func snapshot(r *resource) Status { r.mu.Lock(); defer r.mu.Unlock(); return r.status }
 func (m *Manager) create(requestID, kind string, fp [32]byte, start func(*resource) (running, error), timeout time.Duration) (*resource, error) {
 	if requestID == "" || len(requestID) > 128 {
-		return nil, failure("invalid_argument", "request_id 长度必须在1到128字节之间")
+		return nil, failure("invalid_argument", "request_id must be between 1 and 128 bytes")
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.closed {
-		return nil, failure("closed", "执行管理器已关闭")
+		return nil, failure("closed", "The execution manager is closed")
 	}
 	if r := m.requests[requestID]; r != nil {
 		if r.fingerprint != fp || r.status.Kind != kind {
-			return nil, failure("conflict", "request_id 已用于不同参数")
+			return nil, failure("conflict", "request_id was already used with different parameters")
 		}
 		r.mu.Lock()
 		r.lastCall = time.Now()
@@ -74,17 +74,17 @@ func (m *Manager) create(requestID, kind string, fp [32]byte, start func(*resour
 		maximum = m.cfg.MaxTerminals
 	}
 	if active >= maximum {
-		return nil, failure("resource_limit", "已达到并发资源上限")
+		return nil, failure("resource_limit", "The concurrent resource limit has been reached")
 	}
 	// 终态记录有数量上限，活跃记录不驱逐。
 	for len(m.resources) >= 4*(m.cfg.MaxProcesses+m.cfg.MaxTerminals) {
 		if !m.evictOldest() {
-			return nil, failure("resource_limit", "资源记录已满")
+			return nil, failure("resource_limit", "The resource record limit has been reached")
 		}
 	}
 	idBytes := make([]byte, 16)
 	if _, err := rand.Read(idBytes); err != nil {
-		return nil, failure("internal", "生成资源编号失败")
+		return nil, failure("internal", "Failed to generate a resource ID")
 	}
 	capacity := m.cfg.OutputBytes
 	if kind == "process" {
@@ -151,18 +151,18 @@ func stopResource(r *resource, reason string) error {
 		r.status.Reason = reason
 	}
 	if err := r.process.Kill(); err != nil {
-		return failure("io_error", "终止进程树失败")
+		return failure("io_error", "Failed to terminate the process tree")
 	}
 	return nil
 }
 func (m *Manager) Start(ctx context.Context, in StartInput) (Status, error) {
 	if in.WaitMS < 0 || in.WaitMS > 10000 {
-		return Status{}, failure("invalid_argument", "wait_ms 必须在0到10000之间")
+		return Status{}, failure("invalid_argument", "wait_ms must be between 0 and 10000")
 	}
 	timeout := m.cfg.DefaultTimeout
 	if in.TimeoutMS != nil {
 		if *in.TimeoutMS < 0 || *in.TimeoutMS > int64((1<<63-1)/time.Millisecond) || (*in.TimeoutMS == 0 && !in.Background) {
-			return Status{}, failure("invalid_argument", "超时无效，仅后台进程可禁用超时")
+			return Status{}, failure("invalid_argument", "Invalid timeout; only background processes may disable the timeout")
 		}
 		timeout = time.Duration(*in.TimeoutMS) * time.Millisecond
 	}
@@ -193,7 +193,7 @@ func (m *Manager) OpenTerminal(in TerminalInput) (Status, error) {
 		in.Rows = 24
 	}
 	if !validSize(in.Columns, in.Rows) {
-		return Status{}, failure("invalid_argument", "终端尺寸必须在1到32767之间")
+		return Status{}, failure("invalid_argument", "Terminal dimensions must be between 1 and 32767")
 	}
 	if in.Command == "" {
 		in.Command = defaultShell()
@@ -215,11 +215,11 @@ func (m *Manager) get(id string) (*resource, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.closed {
-		return nil, failure("closed", "执行管理器已关闭")
+		return nil, failure("closed", "The execution manager is closed")
 	}
 	r := m.resources[id]
 	if r == nil {
-		return nil, failure("not_found", "资源不存在或已过期")
+		return nil, failure("not_found", "The resource does not exist or has expired")
 	}
 	r.mu.Lock()
 	r.lastCall = time.Now()
@@ -252,13 +252,13 @@ func (m *Manager) Read(in ReadInput) (ReadResult, error) {
 		in.Limit = m.cfg.ReadBytes
 	}
 	if in.Limit < 1 || in.Limit > m.cfg.ReadBytes {
-		return ReadResult{}, failure("invalid_argument", "读取长度超过配置上限")
+		return ReadResult{}, failure("invalid_argument", "The read length exceeds the configured limit")
 	}
 	state := snapshot(r)
 	b := r.out
 	if state.Kind == "terminal" {
 		if in.Stream != "" && in.Stream != "terminal" {
-			return ReadResult{}, failure("invalid_argument", "终端仅提供合并输出流")
+			return ReadResult{}, failure("invalid_argument", "Terminals provide only a merged output stream")
 		}
 		in.Stream = "terminal"
 	} else {
@@ -270,7 +270,7 @@ func (m *Manager) Read(in ReadInput) (ReadResult, error) {
 		case "stderr":
 			b = r.err
 		default:
-			return ReadResult{}, failure("invalid_argument", "输出流必须为 stdout 或 stderr")
+			return ReadResult{}, failure("invalid_argument", "The output stream must be stdout or stderr")
 		}
 	}
 	out, err := b.read(in.Cursor, in.Limit)
@@ -286,19 +286,19 @@ func (m *Manager) Write(ctx context.Context, in WriteInput) (WriteResult, error)
 	}
 	s := snapshot(r)
 	if s.Kind != "terminal" || s.State != "running" {
-		return WriteResult{}, failure("invalid_state", "仅运行中的终端可输入")
+		return WriteResult{}, failure("invalid_state", "Input is only allowed for a running terminal")
 	}
 	if len(in.DataBase64) > base64.StdEncoding.EncodedLen(m.cfg.ReadBytes) {
-		return WriteResult{}, failure("resource_limit", "终端输入超过单次限额")
+		return WriteResult{}, failure("resource_limit", "Terminal input exceeds the per-call limit")
 	}
 	data, err := base64.StdEncoding.DecodeString(in.DataBase64)
 	if err != nil || len(data) > m.cfg.ReadBytes {
-		return WriteResult{}, failure("invalid_argument", "终端输入 Base64 无效或过大")
+		return WriteResult{}, failure("invalid_argument", "Terminal input Base64 is invalid or too large")
 	}
 	select {
 	case r.inputBusy <- struct{}{}:
 	default:
-		return WriteResult{}, failure("busy", "上一终端输入尚未完成")
+		return WriteResult{}, failure("busy", "The previous terminal input is still in progress")
 	}
 	type outcome struct {
 		n   int
@@ -316,18 +316,18 @@ func (m *Manager) Write(ctx context.Context, in WriteInput) (WriteResult, error)
 	select {
 	case out := <-result:
 		if out.err != nil {
-			return WriteResult{out.n}, failure("io_error", "终端写入失败，部分字节可能已送达")
+			return WriteResult{out.n}, failure("io_error", "Terminal write failed; some bytes may already have been delivered")
 		}
 		return WriteResult{out.n}, nil
 	case <-ctx.Done():
-		return WriteResult{}, failure("interrupted", "输入等待取消，字节仍可能送达，请勿盲目重试")
+		return WriteResult{}, failure("interrupted", "Waiting for input was canceled; bytes may still be delivered. Do not blindly retry")
 	case <-timer.C:
-		return WriteResult{}, failure("timeout", "输入仍在进行，请勿盲目重试；可关闭终端中断")
+		return WriteResult{}, failure("timeout", "Input is still in progress. Do not blindly retry; close the terminal to interrupt it")
 	}
 }
 func (m *Manager) Resize(in ResizeInput) (Status, error) {
 	if !validSize(in.Columns, in.Rows) {
-		return Status{}, failure("invalid_argument", "终端尺寸必须在1到32767之间")
+		return Status{}, failure("invalid_argument", "Terminal dimensions must be between 1 and 32767")
 	}
 	r, err := m.get(in.ID)
 	if err != nil {
@@ -335,10 +335,10 @@ func (m *Manager) Resize(in ResizeInput) (Status, error) {
 	}
 	s := snapshot(r)
 	if s.Kind != "terminal" || s.State != "running" {
-		return Status{}, failure("invalid_state", "仅运行中的终端可调整尺寸")
+		return Status{}, failure("invalid_state", "Only a running terminal can be resized")
 	}
 	if err = r.process.Resize(in.Columns, in.Rows); err != nil {
-		return Status{}, failure("io_error", "终端尺寸调整失败")
+		return Status{}, failure("io_error", "Failed to resize the terminal")
 	}
 	return snapshot(r), nil
 }

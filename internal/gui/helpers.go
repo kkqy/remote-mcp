@@ -11,28 +11,28 @@ import (
 
 func (c Config) Validate() error {
 	if c.IdleTimeout <= 0 || c.Retention <= 0 || c.AuthorizationTimeout <= 0 || c.OperationTimeout <= 0 || c.SweepInterval <= 0 || c.CaptureRetention <= 0 {
-		return failure("invalid_argument", "GUI 时间限制必须大于零")
+		return failure("invalid_argument", "GUI time limits must be greater than zero")
 	}
 	if c.AuthorizationTimeout > 10*time.Minute || c.OperationTimeout > 2*time.Minute {
-		return failure("invalid_argument", "GUI 授权或操作期限过长")
+		return failure("invalid_argument", "GUI authorization or operation timeout is too long")
 	}
 	if c.MaxRecords < 1 || c.MaxRecords > 4096 || c.MaxCaptures < 1 || c.MaxCaptures > 1024 || c.MaxPixels < 1 || c.MaxPixels > 134217728 || c.MaxPNGBytes < 1 || c.MaxPNGBytes > 128<<20 || c.MaxTextBytes < 1 || c.MaxTextBytes > 1<<20 || c.MaxClipboardBytes < 1 || c.MaxClipboardBytes > 16<<20 {
-		return failure("invalid_argument", "GUI 资源大小或数量限制无效")
+		return failure("invalid_argument", "Invalid GUI resource size or count limit")
 	}
 	return nil
 }
 func checkPixels(w, h, max int) error {
 	if w <= 0 || h <= 0 {
-		return failure("capture_failed", "截图尺寸无效")
+		return failure("capture_failed", "Invalid screenshot dimensions")
 	}
 	if w > max/h {
-		return failure("limit_exceeded", "截图像素超过限制")
+		return failure("limit_exceeded", "Screenshot exceeds the pixel limit")
 	}
 	return nil
 }
 func normalizeKeys(keys []string) ([]string, error) {
 	if len(keys) < 1 || len(keys) > 8 {
-		return nil, failure("invalid_argument", "按键数量必须为1到8")
+		return nil, failure("invalid_argument", "Key count must be between 1 and 8")
 	}
 	names := map[string]string{"ctrl": "Ctrl", "control": "Ctrl", "shift": "Shift", "alt": "Alt", "meta": "Meta", "super": "Meta", "cmd": "Meta", "command": "Meta", "enter": "Enter", "return": "Enter", "escape": "Escape", "esc": "Escape", "tab": "Tab", "space": "Space", "backspace": "Backspace", "delete": "Delete", "insert": "Insert", "home": "Home", "end": "End", "pageup": "PageUp", "pagedown": "PageDown", "up": "Up", "down": "Down", "left": "Left", "right": "Right"}
 	out := make([]string, len(keys))
@@ -51,7 +51,7 @@ func normalizeKeys(keys []string) ([]string, error) {
 			}
 		}
 		if n == "" || seen[n] {
-			return nil, failure("invalid_argument", "包含未知或重复按键")
+			return nil, failure("invalid_argument", "Unknown or duplicate key")
 		}
 		seen[n] = true
 		out[i] = n
@@ -78,13 +78,13 @@ func partialError(err error) error {
 		copy.InputMayHaveApplied = true
 		return &copy
 	}
-	return &Error{Code: "input_failed", Message: "输入未完整结束，部分事件可能已经生效", InputMayHaveApplied: true}
+	return &Error{Code: "input_failed", Message: "Input did not complete; some events may have taken effect", InputMayHaveApplied: true}
 }
 func contextError(ctx context.Context) error {
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return failure("timeout", "GUI 操作等待超时")
+		return failure("timeout", "Timed out waiting for the GUI operation")
 	}
-	return failure("authorization_cancelled", "GUI 调用已取消")
+	return failure("authorization_cancelled", "GUI call was cancelled")
 }
 func performKeys(ctx context.Context, keys []string, emit func(context.Context, string, bool) error) (err error) {
 	var held []string
@@ -185,6 +185,6 @@ func performMouse(ctx context.Context, ev MouseEvent, move func(context.Context,
 		}
 		return release()
 	default:
-		return failure("invalid_argument", "未知鼠标操作")
+		return failure("invalid_argument", "Unknown mouse action")
 	}
 }

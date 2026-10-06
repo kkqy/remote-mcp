@@ -35,7 +35,7 @@ func (b *outputBuffer) read(cursor int64, limit int) (ReadResult, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if cursor < 0 || cursor > b.end {
-		return ReadResult{}, failure("invalid_argument", "游标不在输出范围内")
+		return ReadResult{}, failure("invalid_argument", "The cursor is outside the output range")
 	}
 	start := b.end - int64(len(b.data))
 	truncated := cursor < start

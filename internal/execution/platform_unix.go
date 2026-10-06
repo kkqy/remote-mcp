@@ -41,13 +41,13 @@ func startProcess(cmd *exec.Cmd, out, stderr io.Writer) (running, error) {
 	p := &unixProcess{cmd: cmd, copies: make(chan struct{}, 2), readerCount: 2}
 	stdoutR, stdoutW, err := os.Pipe()
 	if err != nil {
-		return nil, failure("io_error", "创建输出管道失败")
+		return nil, failure("io_error", "Failed to create the stdout pipe")
 	}
 	stderrR, stderrW, err := os.Pipe()
 	if err != nil {
 		stdoutR.Close()
 		stdoutW.Close()
-		return nil, failure("io_error", "创建错误管道失败")
+		return nil, failure("io_error", "Failed to create the stderr pipe")
 	}
 	cmd.Stdout = stdoutW
 	cmd.Stderr = stderrW
@@ -58,7 +58,7 @@ func startProcess(cmd *exec.Cmd, out, stderr io.Writer) (running, error) {
 	if err != nil {
 		stdoutR.Close()
 		stderrR.Close()
-		return nil, failure("start_failed", "进程启动失败，请检查程序、目录及运行账号权限")
+		return nil, failure("start_failed", "Failed to start the process; check the program, working directory, and account permissions")
 	}
 	p.readers = []*os.File{stdoutR, stderrR}
 	go copyOutput(out, stdoutR, p.copies)
@@ -68,14 +68,14 @@ func startProcess(cmd *exec.Cmd, out, stderr io.Writer) (running, error) {
 func startTerminal(cmd *exec.Cmd, columns, rows int, out io.Writer) (running, error) {
 	f, err := pty.StartWithSize(cmd, &pty.Winsize{Cols: uint16(columns), Rows: uint16(rows)})
 	if err != nil {
-		return nil, failure("start_failed", "终端启动失败，请检查 PTY、程序和目录")
+		return nil, failure("start_failed", "Failed to start the terminal; check the PTY, program, and working directory")
 	}
 	// 非阻塞描述符由 Go 轮询器管理，关闭能够解除等待读写。
 	if err = syscall.SetNonblock(int(f.Fd()), true); err != nil {
 		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 		f.Close()
 		cmd.Wait()
-		return nil, failure("io_error", "设置终端非阻塞模式失败")
+		return nil, failure("io_error", "Failed to enable nonblocking terminal I/O")
 	}
 	p := &unixProcess{cmd: cmd, terminal: f, readers: []*os.File{f}, copies: make(chan struct{}, 1), readerCount: 1}
 	go copyOutput(out, f, p.copies)

@@ -18,13 +18,13 @@ func main() {
 		return
 	}
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "启动失败：", err)
+		fmt.Fprintln(os.Stderr, "Startup failed:", err)
 		os.Exit(1)
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if err := server.Run(ctx, c, os.Stdout, os.Stderr); err != nil {
-		fmt.Fprintln(os.Stderr, "服务错误：", err)
+		fmt.Fprintln(os.Stderr, "Service error:", err)
 		os.Exit(1)
 	}
 }

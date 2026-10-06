@@ -55,25 +55,25 @@ func (m *Manager) normalize(in CreateInput) (CreateInput, error) {
 	}
 	ip, err := netip.ParseAddr(in.ListenHost)
 	if err != nil || ip.IsMulticast() {
-		return in, failure("invalid_argument", "监听地址必须为单播或全接口 IP")
+		return in, failure("invalid_argument", "The listen address must be a unicast or wildcard IP address")
 	}
 	in.ListenHost = ip.String()
 	if in.RequestID == "" || len(in.RequestID) > 256 || strings.TrimSpace(in.RequestID) != in.RequestID || in.ListenPort < 0 || in.ListenPort > 65535 || in.TargetPort < 1 || in.TargetPort > 65535 {
-		return in, failure("invalid_argument", "创建键或端口无效")
+		return in, failure("invalid_argument", "Invalid creation key or port")
 	}
 	if ip, err := netip.ParseAddr(in.TargetHost); err == nil {
 		in.TargetHost = ip.String()
 	} else {
 		if len(in.TargetHost) == 0 || len(in.TargetHost) > 253 {
-			return in, failure("invalid_argument", "目标主机名无效")
+			return in, failure("invalid_argument", "Invalid target hostname")
 		}
 		for _, label := range strings.Split(strings.TrimSuffix(in.TargetHost, "."), ".") {
 			if len(label) == 0 || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
-				return in, failure("invalid_argument", "目标主机名无效")
+				return in, failure("invalid_argument", "Invalid target hostname")
 			}
 			for _, ch := range label {
 				if !(ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' || ch == '-') {
-					return in, failure("invalid_argument", "目标主机名无效")
+					return in, failure("invalid_argument", "Invalid target hostname")
 				}
 			}
 		}
@@ -89,11 +89,11 @@ func (m *Manager) Create(in CreateInput) (Status, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.closed {
-		return Status{}, failure("closed", "转发管理器已关闭")
+		return Status{}, failure("closed", "The forwarding manager is closed")
 	}
 	if r := m.requests[in.RequestID]; r != nil {
 		if r.input != in {
-			return Status{}, failure("conflict", "创建键已对应其他参数")
+			return Status{}, failure("conflict", "The creation key was already used with different parameters")
 		}
 		return r.status, nil
 	}
@@ -105,17 +105,17 @@ func (m *Manager) Create(in CreateInput) (Status, error) {
 		}
 	}
 	if active >= m.cfg.MaxRules {
-		return Status{}, failure("resource_limit", "活跃转发规则已达上限")
+		return Status{}, failure("resource_limit", "The active forwarding rule limit has been reached")
 	}
 	if len(m.rules) >= m.cfg.MaxRecords {
 		m.pruneLocked(time.Now(), true)
 	}
 	if len(m.rules) >= m.cfg.MaxRecords {
-		return Status{}, failure("resource_limit", "转发记录已达上限")
+		return Status{}, failure("resource_limit", "The forwarding record limit has been reached")
 	}
 	var id [16]byte
 	if _, err := rand.Read(id[:]); err != nil {
-		return Status{}, failure("internal", "生成资源 ID 失败")
+		return Status{}, failure("internal", "Failed to generate a resource ID")
 	}
 	network := "tcp4"
 	if strings.Contains(in.ListenHost, ":") {
@@ -124,7 +124,7 @@ func (m *Manager) Create(in CreateInput) (Status, error) {
 	// 监听仅使用已验证的数字 IP；锁内绑定保证幂等创建与关闭原子化。
 	listener, err := net.Listen(network, net.JoinHostPort(in.ListenHost, strconv.Itoa(in.ListenPort)))
 	if err != nil {
-		return Status{}, failure("listen_failed", "监听失败，请检查地址、端口及权限")
+		return Status{}, failure("listen_failed", "Failed to listen; check the address, port, and permissions")
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	r := &rule{input: in, status: Status{ID: hex.EncodeToString(id[:]), State: "running", ListenAddress: listener.Addr().String(), TargetAddress: net.JoinHostPort(in.TargetHost, strconv.Itoa(in.TargetPort)), CreatedAt: time.Now()}, listener: listener, ctx: ctx, cancel: cancel, connections: map[*connection]struct{}{}, done: make(chan struct{})}
@@ -255,7 +255,7 @@ func (m *Manager) Stop(in IDInput) (Status, error) {
 	r := m.rules[in.ID]
 	if r == nil {
 		m.mu.Unlock()
-		return Status{}, failure("not_found", "转发规则不存在")
+		return Status{}, failure("not_found", "The forwarding rule does not exist")
 	}
 	m.stopLocked(r, "stopped")
 	m.mu.Unlock()
@@ -269,7 +269,7 @@ func (m *Manager) Status(in IDInput) (Status, error) {
 	defer m.mu.Unlock()
 	r := m.rules[in.ID]
 	if r == nil {
-		return Status{}, failure("not_found", "转发规则不存在")
+		return Status{}, failure("not_found", "The forwarding rule does not exist")
 	}
 	return r.status, nil
 }

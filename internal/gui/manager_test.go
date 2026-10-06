@@ -361,7 +361,7 @@ func TestInputHelpersReleaseAfterCancelAndFailure(t *testing.T) {
 			events = append(events, key+"+")
 			if key == "V" {
 				cancel()
-				return failure("input_failed", "模拟失败")
+				return failure("input_failed", "Simulated failure")
 			}
 		} else {
 			events = append(events, key+"-")
@@ -401,7 +401,7 @@ func TestStatusConcurrentLayoutAndCapabilityChanges(t *testing.T) {
 	for i := 0; i < 20; i++ {
 		d.mu.Lock()
 		d.displays[0].LogicalBounds.X = float64(i)
-		d.caps.Reasons["mouse"] = "布局变化"
+		d.caps.Reasons["mouse"] = "Layout changed"
 		d.mu.Unlock()
 		if _, err := m.Screenshot(context.Background(), ScreenshotInput{ID: id}); err != nil {
 			t.Fatal(err)

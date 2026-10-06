@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""真实 GUI 验证专用窗口；需可选验证依赖 PySide6，不属于服务运行依赖。"""
+"""Dedicated native GUI validation window; requires the optional PySide6 validation dependency, which is not a service runtime dependency."""
 import argparse
 import json
 from pathlib import Path
@@ -39,13 +39,13 @@ class Target(QWidget):
         self.publishing_offer = False
         self.clipboard = QApplication.clipboard()
         self.clipboard.dataChanged.connect(self.clipboard_changed)
-        self.setWindowTitle("GUI 验证窗口")
+        self.setWindowTitle("GUI validation window")
         self.setFixedSize(640, 460)
         self.field = VerificationField(self)
         self.field.setGeometry(50, 100, 540, 60)
         self.field.setStyleSheet("background: white; color: black; font-size: 22px;")
         self.field.textChanged.connect(lambda _: self.save())
-        self.restore_button = QPushButton("恢复测试前剪贴板", self)
+        self.restore_button = QPushButton("Restore original clipboard", self)
         self.restore_button.setGeometry(200, 390, 240, 40)
         self.restore_button.clicked.connect(self.restore_by_user)
         self.restore_button.hide()
@@ -74,14 +74,14 @@ class Target(QWidget):
     def read_clipboard_snapshot(self):
         """同内容发布只读准备；失焦、格式或版本变化时不发布。"""
         if not self.isActiveWindow():
-            raise RuntimeError("窗口未获得读取焦点")
+            raise RuntimeError("The window does not have focus for clipboard reading")
         revision = self.clipboard_revision
         contents = self.clipboard.mimeData()
         formats = contents.formats() if contents is not None else []
         summary, data = copy_snapshot(formats, contents.data if contents is not None else lambda _: b"")
         current = self.clipboard.mimeData()
         if not self.isActiveWindow() or revision != self.clipboard_revision or formats != (current.formats() if current is not None else []):
-            raise RuntimeError("剪贴板在读取期间发生变化")
+            raise RuntimeError("The clipboard changed while it was being read")
         return summary, data, revision
 
     def publish_clipboard_snapshot(self, contents):
@@ -115,7 +115,7 @@ class Target(QWidget):
             baseline = self.original_baseline
             omitted_control = KDE_CONTROL_MIME in payload
             if omitted_control:
-                answer = QMessageBox.question(self, "剪贴板恢复", "原备份含 KDE 所有权控制标记，原样发布会被拒绝。是否仅恢复有效数据格式，并明确省略这个控制标记？",
+                answer = QMessageBox.question(self, "Clipboard restoration", "The original backup contains a KDE ownership control format and cannot be republished unchanged. Restore only the data formats and explicitly omit this control format?",
                                               QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
                 if answer != QMessageBox.StandardButton.Yes:
                     return
@@ -128,13 +128,13 @@ class Target(QWidget):
             self.recovery_pending = False
             self.restore_button.hide()
             if omitted_control:
-                QMessageBox.information(self, "剪贴板恢复", "有效数据摘要已核对，控制标记未复制；原格式集合未完全恢复。")
+                QMessageBox.information(self, "Clipboard restoration", "Data digests have been verified and the control format was omitted; the original format set was not fully restored.")
         except Exception:
-            QMessageBox.warning(self, "剪贴板恢复", "恢复未能确认，内存备份仍保留。")
+            QMessageBox.warning(self, "Clipboard restoration", "Restoration could not be confirmed; the in-memory backup is still retained.")
 
     def closeEvent(self, event):
         if self.recovery_pending and self.original_snapshot is not None:
-            answer = QMessageBox.question(self, "保留剪贴板备份", "关闭窗口会丢失尚未恢复的内存备份。是否仍关闭？",
+            answer = QMessageBox.question(self, "Retain clipboard backup", "Closing this window will discard the in-memory backup that has not been restored. Close anyway?",
                                           QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
             if answer != QMessageBox.StandardButton.Yes:
                 event.ignore()
@@ -188,7 +188,7 @@ class Target(QWidget):
             summary = summarize(formats, contents.data if contents is not None else lambda _: b"")
             current = self.clipboard.mimeData()
             if not self.isActiveWindow() or revision != self.clipboard_revision or formats != (current.formats() if current is not None else []):
-                raise RuntimeError("剪贴板在采样期间发生变化")
+                raise RuntimeError("The clipboard changed while it was being sampled")
             response.update(ok=True, summary=summary)
         except Exception as error:
             # 仅固定准备阶段代号可进入报告，任意 Qt/读取异常仍脱敏。
@@ -247,7 +247,7 @@ class Target(QWidget):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence", required=True)
-    parser.add_argument("--inputs-only", action="store_true", help="仅用固定字段验证键鼠，不准备剪贴板")
+    parser.add_argument("--inputs-only", action="store_true", help="Verify mouse and keyboard input using a fixed field without preparing the clipboard")
     args = parser.parse_args()
     application = QApplication(sys.argv[:1])
     target = Target(Path(args.evidence), inputs_only=args.inputs_only)

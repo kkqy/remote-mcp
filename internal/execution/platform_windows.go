@@ -68,13 +68,13 @@ func newConsole(columns, rows int) (*conpty.ConPty, error) {
 func startProcess(cmd *exec.Cmd, out, stderr io.Writer) (running, error) {
 	stdoutR, stdoutW, err := os.Pipe()
 	if err != nil {
-		return nil, failure("io_error", "创建输出管道失败")
+		return nil, failure("io_error", "Failed to create the stdout pipe")
 	}
 	stderrR, stderrW, err := os.Pipe()
 	if err != nil {
 		stdoutR.Close()
 		stdoutW.Close()
-		return nil, failure("io_error", "创建错误管道失败")
+		return nil, failure("io_error", "Failed to create the stderr pipe")
 	}
 	stdin, err := os.Open(os.DevNull)
 	if err != nil {
@@ -82,7 +82,7 @@ func startProcess(cmd *exec.Cmd, out, stderr io.Writer) (running, error) {
 		stdoutW.Close()
 		stderrR.Close()
 		stderrW.Close()
-		return nil, failure("io_error", "打开空输入失败")
+		return nil, failure("io_error", "Failed to open null input")
 	}
 	defer stdin.Close()
 	defer stdoutW.Close()
@@ -92,7 +92,7 @@ func startProcess(cmd *exec.Cmd, out, stderr io.Writer) (running, error) {
 	if err != nil {
 		stdoutR.Close()
 		stderrR.Close()
-		return nil, failure("start_failed", "进程或 Job Object 启动失败，请检查程序、目录和权限")
+		return nil, failure("start_failed", "Failed to start the process or Job Object; check the program, working directory, and permissions")
 	}
 	go copyOutput(out, stdoutR, p.copies)
 	go copyOutput(stderr, stderrR, p.copies)
@@ -101,7 +101,7 @@ func startProcess(cmd *exec.Cmd, out, stderr io.Writer) (running, error) {
 func startTerminal(cmd *exec.Cmd, columns, rows int, out io.Writer) (running, error) {
 	console, err := newConsole(columns, rows)
 	if err != nil {
-		return nil, failure("start_failed", "创建 ConPTY 失败，要求 Windows 10 1809 或更新系统")
+		return nil, failure("start_failed", "Failed to create ConPTY; Windows 10 version 1809 or later is required")
 	}
 	p := &windowsProcess{terminal: console, copies: make(chan struct{}, 1), readerCount: 1}
 	// ClosePseudoConsole 可能等待输出排空，读循环必须先于任何关闭路径启动。
@@ -109,7 +109,7 @@ func startTerminal(cmd *exec.Cmd, columns, rows int, out io.Writer) (running, er
 	if err = p.spawn(cmd, nil); err != nil {
 		console.Close()
 		<-p.copies
-		return nil, failure("start_failed", "终端进程或 Job Object 启动失败，请检查程序、目录和权限")
+		return nil, failure("start_failed", "Failed to start the terminal process or Job Object; check the program, working directory, and permissions")
 	}
 	return p, nil
 }

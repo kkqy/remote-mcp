@@ -46,26 +46,26 @@ func New(c config.Config, diagnostics io.Writer) (*App, error) {
 	}
 	files, err := transfer.New(c.Transfer)
 	if err != nil {
-		return nil, fmt.Errorf("文件传输配置无效: %w", err)
+		return nil, fmt.Errorf("Invalid file transfer configuration: %w", err)
 	}
 	processes, err := execution.New(c.Execution)
 	if err != nil {
 		files.Close()
-		return nil, fmt.Errorf("执行配置无效: %w", err)
+		return nil, fmt.Errorf("Invalid execution configuration: %w", err)
 	}
 	c.Forwarding.ListenHost, _, _ = net.SplitHostPort(c.Listen)
 	forwards, err := forwarding.New(c.Forwarding)
 	if err != nil {
 		processes.Close()
 		files.Close()
-		return nil, fmt.Errorf("转发配置无效: %w", err)
+		return nil, fmt.Errorf("Invalid forwarding configuration: %w", err)
 	}
 	graphics, err := gui.New(c.GUI)
 	if err != nil {
 		forwards.Close()
 		processes.Close()
 		files.Close()
-		return nil, fmt.Errorf("图形操作配置无效: %w", err)
+		return nil, fmt.Errorf("Invalid GUI configuration: %w", err)
 	}
 	app := &App{config: c, files: files, execution: processes, forwarding: forwards, gui: graphics}
 	// SDK 调试日志可能携带远端参数，运行日志只使用下方固定元数据。
@@ -81,10 +81,10 @@ func New(c config.Config, diagnostics io.Writer) (*App, error) {
 			start := time.Now()
 			result, err := next(ctx, method, req)
 			if method == "tools/call" {
-				name := "未知工具"
+				name := redactToken("unknown_tool", c.Token)
 				if request, ok := req.(*mcp.CallToolRequest); ok && request != nil && request.Params != nil {
 					candidate := request.Params.Name
-					if len(candidate) <= 64 && (c.Token == "" || !strings.Contains(candidate, c.Token)) && strings.Trim(candidate, "abcdefghijklmnopqrstuvwxyz0123456789_") == "" {
+					if toolDomain(candidate) != "" && (c.Token == "" || !strings.Contains(candidate, c.Token)) {
 						name = candidate
 					}
 				}
@@ -92,7 +92,11 @@ func New(c config.Config, diagnostics io.Writer) (*App, error) {
 				if call, ok := result.(*mcp.CallToolResult); ok && call != nil {
 					failed = failed || call.IsError
 				}
-				logger.Info("工具调用完成", "tool", name, "elapsed", time.Since(start), "failed", failed)
+				attributes := []any{"tool", name, "elapsed", time.Since(start), "failed", failed}
+				if failed {
+					attributes = append(attributes, toolErrorAttributes(req, result, err, c.Token)...)
+				}
+				logger.Info("Tool call completed", attributes...)
 			}
 			return result, err
 		}
@@ -105,7 +109,7 @@ func New(c config.Config, diagnostics io.Writer) (*App, error) {
 	}
 	app.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if app.closing.Load() {
-			http.Error(w, "服务正在关闭", http.StatusServiceUnavailable)
+			http.Error(w, "Service is shutting down", http.StatusServiceUnavailable)
 			return
 		}
 		if c.Token != "" {
@@ -120,12 +124,12 @@ func New(c config.Config, diagnostics io.Writer) (*App, error) {
 			}
 			if !valid {
 				w.Header().Set("WWW-Authenticate", `Bearer realm="remote-mcp"`)
-				http.Error(w, "Token 无效或缺失", http.StatusUnauthorized)
+				http.Error(w, "Invalid or missing token", http.StatusUnauthorized)
 				return
 			}
 		}
 		if origin, exists := r.Header["Origin"]; exists && (len(origin) != 1 || !origins[origin[0]]) {
-			http.Error(w, "Origin 不被允许", http.StatusForbidden)
+			http.Error(w, "Origin is not allowed", http.StatusForbidden)
 			return
 		}
 		if r.URL.Path != "/mcp" {
@@ -159,7 +163,7 @@ func Run(ctx context.Context, c config.Config, out, diagnostics io.Writer) error
 	if c.TLSCert != "" {
 		certificate, err := tls.LoadX509KeyPair(c.TLSCert, c.TLSKey)
 		if err != nil {
-			return errors.New("无法加载 TLS 证书和私钥")
+			return errors.New("Unable to load TLS certificate and private key")
 		}
 		tlsConfig = &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{certificate}}
 	}
@@ -170,7 +174,7 @@ func Run(ctx context.Context, c config.Config, out, diagnostics io.Writer) error
 	}
 	listener, err := net.Listen(network, c.Listen)
 	if err != nil {
-		return errors.New("监听失败，请检查地址、端口和权限")
+		return errors.New("Unable to listen; check address, port, and permissions")
 	}
 	defer listener.Close()
 	bound := listener.Addr().(*net.TCPAddr)
@@ -186,7 +190,7 @@ func Run(ctx context.Context, c config.Config, out, diagnostics io.Writer) error
 	select {
 	case err := <-done:
 		if !errors.Is(err, http.ErrServerClosed) {
-			return errors.New("HTTP 服务停止运行")
+			return errors.New("HTTP service stopped")
 		}
 		return nil
 	case <-ctx.Done():
@@ -201,9 +205,9 @@ func Run(ctx context.Context, c config.Config, out, diagnostics io.Writer) error
 		}
 		<-done
 		if closeErr != nil {
-			return errors.New("关闭部分资源失败")
+			return errors.New("Failed to close some resources")
 		}
-		fmt.Fprintln(diagnostics, "服务已关闭，关联资源已清理。")
+		fmt.Fprintln(diagnostics, "Service stopped; associated resources have been cleaned up.")
 		return nil
 	}
 }

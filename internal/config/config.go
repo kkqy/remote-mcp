@@ -38,39 +38,39 @@ func Parse(args []string, stderr io.Writer) (Config, error) {
 	// flag 的默认解析错误可能回显参数值；只输出经过筛选的错误。
 	fs.SetOutput(io.Discard)
 	var tokenFile, origins string
-	fs.StringVar(&c.Listen, "listen", c.Listen, "监听 IP 和端口；端口 0 自动分配")
-	fs.StringVar(&tokenFile, "token-file", "", "可选 Token 文件；默认读取 REMOTE_MCP_TOKEN，未配置时允许匿名访问")
-	fs.StringVar(&c.TLSCert, "tls-cert", "", "TLS 证书文件")
-	fs.StringVar(&c.TLSKey, "tls-key", "", "TLS 私钥文件")
-	fs.StringVar(&origins, "allowed-origins", "", "允许的 Origin，逗号分隔；默认拒绝所有带 Origin 的请求")
-	fs.Int64Var(&c.MaxBodyBytes, "max-body-bytes", c.MaxBodyBytes, "HTTP 请求体最大字节数")
-	fs.Int64Var(&c.Transfer.MaxFileSize, "max-file-bytes", c.Transfer.MaxFileSize, "单文件最大字节数")
-	fs.IntVar(&c.Transfer.ChunkSize, "chunk-bytes", c.Transfer.ChunkSize, "每块原始数据最大字节数")
-	fs.IntVar(&c.Transfer.MaxTransfers, "max-transfers", c.Transfer.MaxTransfers, "最大并发传输数")
-	fs.DurationVar(&c.Transfer.IdleTimeout, "transfer-idle", c.Transfer.IdleTimeout, "传输空闲回收时间")
-	fs.DurationVar(&c.Transfer.Retention, "transfer-retention", c.Transfer.Retention, "已结束传输记录保留时间")
-	fs.IntVar(&c.Transfer.MaxRecords, "max-transfer-records", c.Transfer.MaxRecords, "最大传输记录数")
-	fs.DurationVar(&c.Execution.DefaultTimeout, "command-timeout", c.Execution.DefaultTimeout, "普通命令默认超时")
-	fs.DurationVar(&c.Execution.TerminalIdleTimeout, "terminal-idle", c.Execution.TerminalIdleTimeout, "终端无调用活动回收时间")
-	fs.DurationVar(&c.Execution.Retention, "process-retention", c.Execution.Retention, "已结束进程和终端保留时间")
-	fs.DurationVar(&c.Execution.SweepInterval, "sweep-interval", c.Execution.SweepInterval, "执行资源回收检查间隔")
-	fs.IntVar(&c.Execution.MaxProcesses, "max-processes", c.Execution.MaxProcesses, "最大并发进程数")
-	fs.IntVar(&c.Execution.MaxTerminals, "max-terminals", c.Execution.MaxTerminals, "最大并发终端数")
-	fs.IntVar(&c.Execution.OutputBytes, "output-bytes", c.Execution.OutputBytes, "每个进程或终端的输出缓冲字节数")
-	fs.IntVar(&c.Execution.ReadBytes, "read-bytes", c.Execution.ReadBytes, "单次输出读取最大字节数")
-	fs.IntVar(&c.Forwarding.MaxRules, "max-forwards", c.Forwarding.MaxRules, "最大活跃 TCP 转发规则数")
-	fs.IntVar(&c.Forwarding.MaxConnections, "max-forward-connections", c.Forwarding.MaxConnections, "TCP 转发全局连接数上限（含拨号中）")
-	fs.IntVar(&c.Forwarding.MaxRecords, "max-forward-records", c.Forwarding.MaxRecords, "TCP 转发最大记录数")
-	fs.DurationVar(&c.Forwarding.DialTimeout, "forward-dial-timeout", c.Forwarding.DialTimeout, "TCP 转发目标连接超时")
-	fs.DurationVar(&c.Forwarding.Retention, "forward-retention", c.Forwarding.Retention, "TCP 转发终态保留时间")
-	fs.DurationVar(&c.Forwarding.SweepInterval, "forward-sweep-interval", c.Forwarding.SweepInterval, "TCP 转发记录清理间隔")
-	fs.DurationVar(&c.GUI.IdleTimeout, "gui-idle", c.GUI.IdleTimeout, "图形会话无调用活动回收时间")
-	fs.DurationVar(&c.GUI.AuthorizationTimeout, "gui-authorize-timeout", c.GUI.AuthorizationTimeout, "图形桌面授权总等待期限")
-	fs.DurationVar(&c.GUI.OperationTimeout, "gui-operation-timeout", c.GUI.OperationTimeout, "截图和输入单次操作等待期限")
-	fs.IntVar(&c.GUI.MaxPixels, "gui-max-pixels", c.GUI.MaxPixels, "原始显示器截图最大像素数")
-	fs.IntVar(&c.GUI.MaxPNGBytes, "gui-max-png-bytes", c.GUI.MaxPNGBytes, "单张 PNG 截图最大字节数")
+	fs.StringVar(&c.Listen, "listen", c.Listen, "Listen IP and port; port 0 selects an available port")
+	fs.StringVar(&tokenFile, "token-file", "", "Optional token file; defaults to REMOTE_MCP_TOKEN; allows anonymous access when unset")
+	fs.StringVar(&c.TLSCert, "tls-cert", "", "TLS certificate file")
+	fs.StringVar(&c.TLSKey, "tls-key", "", "TLS private key file")
+	fs.StringVar(&origins, "allowed-origins", "", "Allowed Origins, separated by commas; all requests with Origin are rejected by default")
+	fs.Int64Var(&c.MaxBodyBytes, "max-body-bytes", c.MaxBodyBytes, "Maximum HTTP request body size in bytes")
+	fs.Int64Var(&c.Transfer.MaxFileSize, "max-file-bytes", c.Transfer.MaxFileSize, "Maximum file size in bytes")
+	fs.IntVar(&c.Transfer.ChunkSize, "chunk-bytes", c.Transfer.ChunkSize, "Maximum raw chunk size in bytes")
+	fs.IntVar(&c.Transfer.MaxTransfers, "max-transfers", c.Transfer.MaxTransfers, "Maximum concurrent transfers")
+	fs.DurationVar(&c.Transfer.IdleTimeout, "transfer-idle", c.Transfer.IdleTimeout, "Transfer idle timeout")
+	fs.DurationVar(&c.Transfer.Retention, "transfer-retention", c.Transfer.Retention, "Completed transfer record retention")
+	fs.IntVar(&c.Transfer.MaxRecords, "max-transfer-records", c.Transfer.MaxRecords, "Maximum transfer records")
+	fs.DurationVar(&c.Execution.DefaultTimeout, "command-timeout", c.Execution.DefaultTimeout, "Default command timeout")
+	fs.DurationVar(&c.Execution.TerminalIdleTimeout, "terminal-idle", c.Execution.TerminalIdleTimeout, "Terminal timeout without calls")
+	fs.DurationVar(&c.Execution.Retention, "process-retention", c.Execution.Retention, "Completed process and terminal record retention")
+	fs.DurationVar(&c.Execution.SweepInterval, "sweep-interval", c.Execution.SweepInterval, "Execution resource cleanup interval")
+	fs.IntVar(&c.Execution.MaxProcesses, "max-processes", c.Execution.MaxProcesses, "Maximum concurrent processes")
+	fs.IntVar(&c.Execution.MaxTerminals, "max-terminals", c.Execution.MaxTerminals, "Maximum concurrent terminals")
+	fs.IntVar(&c.Execution.OutputBytes, "output-bytes", c.Execution.OutputBytes, "Output buffer size per process or terminal in bytes")
+	fs.IntVar(&c.Execution.ReadBytes, "read-bytes", c.Execution.ReadBytes, "Maximum output bytes per read")
+	fs.IntVar(&c.Forwarding.MaxRules, "max-forwards", c.Forwarding.MaxRules, "Maximum active TCP forwarding rules")
+	fs.IntVar(&c.Forwarding.MaxConnections, "max-forward-connections", c.Forwarding.MaxConnections, "Global TCP forwarding connection limit, including pending connections")
+	fs.IntVar(&c.Forwarding.MaxRecords, "max-forward-records", c.Forwarding.MaxRecords, "Maximum TCP forwarding records")
+	fs.DurationVar(&c.Forwarding.DialTimeout, "forward-dial-timeout", c.Forwarding.DialTimeout, "TCP forwarding target connection timeout")
+	fs.DurationVar(&c.Forwarding.Retention, "forward-retention", c.Forwarding.Retention, "Completed TCP forwarding record retention")
+	fs.DurationVar(&c.Forwarding.SweepInterval, "forward-sweep-interval", c.Forwarding.SweepInterval, "TCP forwarding record cleanup interval")
+	fs.DurationVar(&c.GUI.IdleTimeout, "gui-idle", c.GUI.IdleTimeout, "GUI session timeout without calls")
+	fs.DurationVar(&c.GUI.AuthorizationTimeout, "gui-authorize-timeout", c.GUI.AuthorizationTimeout, "Total GUI authorization timeout")
+	fs.DurationVar(&c.GUI.OperationTimeout, "gui-operation-timeout", c.GUI.OperationTimeout, "Screenshot and input operation timeout")
+	fs.IntVar(&c.GUI.MaxPixels, "gui-max-pixels", c.GUI.MaxPixels, "Maximum pixels in a raw display screenshot")
+	fs.IntVar(&c.GUI.MaxPNGBytes, "gui-max-png-bytes", c.GUI.MaxPNGBytes, "Maximum PNG screenshot size in bytes")
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "用法：remote-mcp [选项]；启动后每个 IP 输出一份备选 MCP JSON。")
+		fmt.Fprintln(stderr, "Usage: remote-mcp [options]; startup prints an alternative MCP JSON configuration for each IP.")
 		fs.SetOutput(stderr)
 		fs.PrintDefaults()
 		fs.SetOutput(io.Discard)
@@ -79,10 +79,10 @@ func Parse(args []string, stderr io.Writer) (Config, error) {
 		if errors.Is(err, flag.ErrHelp) {
 			return c, err
 		}
-		return c, errors.New("命令行参数无效，请使用 --help 查看用法")
+		return c, errors.New("Invalid command-line arguments; use --help for usage")
 	}
 	if fs.NArg() != 0 {
-		return c, errors.New("不接受位置参数")
+		return c, errors.New("Positional arguments are not accepted")
 	}
 	tokenFileSet := false
 	fs.Visit(func(f *flag.Flag) {
@@ -91,7 +91,7 @@ func Parse(args []string, stderr io.Writer) (Config, error) {
 		}
 	})
 	if tokenFileSet && tokenFile == "" {
-		return c, errors.New("Token 文件路径不能为空")
+		return c, errors.New("Token file path must not be empty")
 	}
 	var err error
 	c.Token, err = LoadToken(tokenFile)
@@ -110,24 +110,24 @@ func (c Config) Validate() error {
 	}
 	host, port, err := net.SplitHostPort(c.Listen)
 	if err != nil {
-		return errors.New("监听地址必须为 IP:端口")
+		return errors.New("Listen address must be IP:port")
 	}
 	if _, err = netip.ParseAddr(host); err != nil {
-		return errors.New("监听地址须使用明确的 IPv4 或 IPv6 地址")
+		return errors.New("Listen address must use an explicit IPv4 or IPv6 address")
 	}
 	if _, err = net.LookupPort("tcp", port); err != nil {
-		return errors.New("监听端口无效")
+		return errors.New("Invalid listen port")
 	}
 	if (c.TLSCert == "") != (c.TLSKey == "") {
-		return errors.New("TLS 证书和私钥必须同时提供")
+		return errors.New("TLS certificate and private key must be provided together")
 	}
 	if c.MaxBodyBytes <= 0 || c.Transfer.ChunkSize <= 0 || int64(c.Transfer.ChunkSize) > (c.MaxBodyBytes-4096)/4*3 {
-		return errors.New("请求体上限须容纳 Base64 分块及至少 4 KiB 元数据")
+		return errors.New("Request body limit must fit a Base64 chunk and at least 4 KiB of metadata")
 	}
 	for _, origin := range c.AllowedOrigins {
 		u, err := url.Parse(origin)
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
-			return errors.New("Origin 须为不含路径的 http(s) 源地址")
+			return errors.New("Origin must be an HTTP(S) origin without a path")
 		}
 	}
 	if err := c.Forwarding.Validate(); err != nil {

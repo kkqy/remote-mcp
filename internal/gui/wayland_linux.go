@@ -33,11 +33,11 @@ func portalConnect(ctx context.Context) (*dbus.Conn, error) {
 	// 单独连接具有独立生命周期；授权 ctx 不绑定已经就绪的会话。
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
-		return nil, failure("no_gui", "无法连接当前用户会话 D-Bus")
+		return nil, failure("no_gui", "Unable to connect to the current user's session D-Bus")
 	}
 	if !conn.SupportsUnixFDs() {
 		_ = conn.Close()
-		return nil, failure("unsupported", "会话总线不支持 Unix FD 传递")
+		return nil, failure("unsupported", "The session bus does not support Unix FD passing")
 	}
 	if err := ctx.Err(); err != nil {
 		_ = conn.Close()
@@ -60,18 +60,18 @@ func portalUint(ctx context.Context, c *dbus.Conn, iface, name string) uint32 {
 }
 func gstProbe(ctx context.Context) error {
 	if _, err := exec.LookPath("gst-launch-1.0"); err != nil {
-		return failure("dependency_missing", "Wayland 截图需要 gst-launch-1.0")
+		return failure("dependency_missing", "Wayland screenshots require gst-launch-1.0")
 	}
 	inspect, err := exec.LookPath("gst-inspect-1.0")
 	if err != nil {
-		return failure("dependency_missing", "Wayland 截图需要 gst-inspect-1.0")
+		return failure("dependency_missing", "Wayland screenshots require gst-inspect-1.0")
 	}
 	for _, plugin := range []string{"pipewiresrc", "videoconvert", "pngenc", "fdsink"} {
 		cmd := exec.CommandContext(ctx, inspect, plugin)
 		cmd.Stdout = io.Discard
 		cmd.Stderr = io.Discard
 		if cmd.Run() != nil {
-			return failure("dependency_missing", "Wayland 截图缺少 GStreamer 必需插件")
+			return failure("dependency_missing", "Required GStreamer plugins for Wayland screenshots are missing")
 		}
 	}
 	return nil
@@ -79,14 +79,14 @@ func gstProbe(ctx context.Context) error {
 func (b *waylandBackend) probe(ctx context.Context, c *dbus.Conn) (Status, error) {
 	out := Status{Backend: "wayland-portal", State: "available", Displays: []Display{}, Capabilities: Capabilities{Reasons: map[string]string{}}}
 	if portalUint(ctx, c, screenInterface, "version") == 0 {
-		return out, failure("dependency_missing", "ScreenCast Portal 不可用")
+		return out, failure("dependency_missing", "The ScreenCast Portal is unavailable")
 	}
 	sources := portalUint(ctx, c, screenInterface, "AvailableSourceTypes")
 	if sources&1 == 0 {
-		return out, failure("unsupported", "当前 Portal 不提供显示器采集")
+		return out, failure("unsupported", "The current Portal does not support display capture")
 	}
 	if err := gstProbe(ctx); err != nil {
-		out.Capabilities.Reasons["screenshot"] = "GStreamer 运行依赖缺失"
+		out.Capabilities.Reasons["screenshot"] = "GStreamer runtime dependencies are missing"
 		return out, err
 	}
 	out.Capabilities.Screenshot = true
@@ -96,13 +96,13 @@ func (b *waylandBackend) probe(ctx context.Context, c *dbus.Conn) (Status, error
 	out.Capabilities.Clipboard = portalUint(ctx, c, clipboardInterface, "version") > 0 && out.Capabilities.Keyboard
 	out.Capabilities.Text = out.Capabilities.Clipboard
 	if !out.Capabilities.Mouse {
-		out.Capabilities.Reasons["mouse"] = "RemoteDesktop Portal 不支持指针"
+		out.Capabilities.Reasons["mouse"] = "The RemoteDesktop Portal does not support pointer input"
 	}
 	if !out.Capabilities.Keyboard {
-		out.Capabilities.Reasons["keyboard"] = "RemoteDesktop Portal 不支持键盘"
+		out.Capabilities.Reasons["keyboard"] = "The RemoteDesktop Portal does not support keyboard input"
 	}
 	if !out.Capabilities.Text {
-		out.Capabilities.Reasons["text"] = "Portal 剪贴板或键盘不可用"
+		out.Capabilities.Reasons["text"] = "Portal clipboard or keyboard input is unavailable"
 	}
 	return out, nil
 }
@@ -127,7 +127,7 @@ func portalRequest(ctx context.Context, c *dbus.Conn, iface, method string, args
 	defer c.RemoveSignal(ch)
 	match := []dbus.MatchOption{dbus.WithMatchSender(portalName), dbus.WithMatchInterface("org.freedesktop.portal.Request"), dbus.WithMatchMember("Response"), dbus.WithMatchObjectPath(path)}
 	if err := c.AddMatchSignalContext(ctx, match...); err != nil {
-		return nil, failure("dependency_missing", "无法订阅桌面授权响应")
+		return nil, failure("dependency_missing", "Unable to subscribe to desktop authorization responses")
 	}
 	defer func() {
 		cleanup, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -137,10 +137,10 @@ func portalRequest(ctx context.Context, c *dbus.Conn, iface, method string, args
 	args = append(args, options)
 	var actual dbus.ObjectPath
 	if err := c.Object(portalName, portalPath).CallWithContext(ctx, iface+"."+method, 0, args...).Store(&actual); err != nil {
-		return nil, failure("permission_denied", "桌面 Portal 请求失败")
+		return nil, failure("permission_denied", "Desktop Portal request failed")
 	}
 	if actual != path {
-		return nil, failure("unsupported", "Portal 返回了不符合句柄约定的请求路径")
+		return nil, failure("unsupported", "The Portal returned a request path that violates the handle convention")
 	}
 	for {
 		select {
@@ -149,12 +149,12 @@ func portalRequest(ctx context.Context, c *dbus.Conn, iface, method string, args
 			_ = c.Object(portalName, path).CallWithContext(cleanup, "org.freedesktop.portal.Request.Close", 0).Err
 			cancel()
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				return nil, failure("authorization_timeout", "桌面授权等待超时")
+				return nil, failure("authorization_timeout", "Timed out waiting for desktop authorization")
 			}
-			return nil, failure("authorization_cancelled", "桌面授权已取消")
+			return nil, failure("authorization_cancelled", "Desktop authorization was cancelled")
 		case sig, ok := <-ch:
 			if !ok {
-				return nil, failure("session_closed", "桌面总线已断开")
+				return nil, failure("session_closed", "Desktop session bus was disconnected")
 			}
 			if sig.Path != path || len(sig.Body) != 2 {
 				continue
@@ -162,13 +162,13 @@ func portalRequest(ctx context.Context, c *dbus.Conn, iface, method string, args
 			code, ok := sig.Body[0].(uint32)
 			result, valid := sig.Body[1].(map[string]dbus.Variant)
 			if !ok || !valid {
-				return nil, failure("capture_failed", "桌面授权响应格式无效")
+				return nil, failure("capture_failed", "Invalid desktop authorization response")
 			}
 			if code == 1 {
-				return nil, failure("authorization_cancelled", "本机用户取消了桌面授权")
+				return nil, failure("authorization_cancelled", "The local user cancelled desktop authorization")
 			}
 			if code != 0 {
-				return nil, failure("permission_denied", "桌面授权未获准")
+				return nil, failure("permission_denied", "Desktop authorization was denied")
 			}
 			return result, nil
 		}
@@ -231,11 +231,11 @@ func (b *waylandBackend) Open(ctx context.Context) (Desktop, error) {
 	}
 	raw, ok := created["session_handle"].Value().(string)
 	if !ok {
-		return nil, failure("capture_failed", "桌面授权未返回会话")
+		return nil, failure("capture_failed", "Desktop authorization did not return a session")
 	}
 	path := dbus.ObjectPath(raw)
 	if !path.IsValid() {
-		return nil, failure("capture_failed", "桌面会话路径无效")
+		return nil, failure("capture_failed", "Invalid desktop session path")
 	}
 	life, cancel := context.WithCancel(context.Background())
 	d := &waylandDesktop{cfg: b.cfg, conn: c, path: path, remote: remote, caps: probe.Capabilities, nodes: map[string]uint32{}, done: make(chan struct{}), life: life, cancel: cancel, signals: make(chan *dbus.Signal, 64)}
@@ -247,7 +247,7 @@ func (b *waylandBackend) Open(ctx context.Context) (Desktop, error) {
 	c.Signal(d.signals)
 	for _, match := range [][]dbus.MatchOption{{dbus.WithMatchSender(portalName), dbus.WithMatchInterface("org.freedesktop.portal.Session"), dbus.WithMatchObjectPath(path)}, {dbus.WithMatchSender(portalName), dbus.WithMatchInterface(clipboardInterface), dbus.WithMatchObjectPath(portalPath)}} {
 		if err := c.AddMatchSignalContext(ctx, match...); err != nil {
-			return nil, failure("dependency_missing", "无法订阅桌面会话信号")
+			return nil, failure("dependency_missing", "Unable to subscribe to desktop session signals")
 		}
 	}
 	d.clipboard = newPortalClipboard(d)
@@ -265,7 +265,7 @@ func (b *waylandBackend) Open(ctx context.Context) (Desktop, error) {
 			if err := c.Object(portalName, portalPath).CallWithContext(ctx, clipboardInterface+".RequestClipboard", 0, path, map[string]dbus.Variant{}).Err; err != nil {
 				d.caps.Clipboard = false
 				d.caps.Text = false
-				d.caps.Reasons["text"] = "Portal 拒绝剪贴板请求"
+				d.caps.Reasons["text"] = "The Portal denied the clipboard request"
 			}
 		}
 	}
@@ -282,10 +282,10 @@ func (b *waylandBackend) Open(ctx context.Context) (Desktop, error) {
 	}
 	var streams []portalStream
 	if started["streams"].Value() == nil || started["streams"].Signature().String() != "a(ua{sv})" {
-		return nil, failure("permission_denied", "未获授权任何显示器")
+		return nil, failure("permission_denied", "No displays were authorized")
 	}
 	if err := dbus.Store([]any{started["streams"].Value()}, &streams); err != nil || len(streams) == 0 {
-		return nil, failure("permission_denied", "未获授权任何显示器")
+		return nil, failure("permission_denied", "No displays were authorized")
 	}
 	d.verifyLayout(ctx)
 	devices, _ := started["devices"].Value().(uint32)
@@ -305,16 +305,16 @@ func (b *waylandBackend) Open(ctx context.Context) (Desktop, error) {
 	}
 	sort.Slice(d.displays, func(i, j int) bool { return d.displays[i].ID < d.displays[j].ID })
 	if !d.caps.Mouse {
-		d.caps.Reasons["mouse"] = "本次会话未获指针权限"
+		d.caps.Reasons["mouse"] = "Pointer input was not authorized for this session"
 	}
 	if !d.caps.Keyboard {
-		d.caps.Reasons["keyboard"] = "本次会话未获键盘权限"
+		d.caps.Reasons["keyboard"] = "Keyboard input was not authorized for this session"
 	}
 	if !d.caps.Text {
-		d.caps.Reasons["text"] = "本次会话未获剪贴板及键盘权限"
+		d.caps.Reasons["text"] = "Clipboard and keyboard access were not authorized for this session"
 	}
 	if !monitoring || d.layoutInvalidated {
-		d.caps.Reasons["absolute_input"] = "无法可靠监视当前逻辑布局，或授权期间布局改变；绝对坐标输入已禁用"
+		d.caps.Reasons["absolute_input"] = "Reliable logical layout monitoring is unavailable or the layout changed during authorization; absolute coordinate input is disabled"
 	}
 	d.mu.Unlock()
 	success = true
@@ -358,7 +358,7 @@ func displayFromPortal(stream portalStream, primary bool) Display {
 		w, h, ok = tupleInts(stream.Props["size"])
 	}
 	x, y, _ := tupleInts(stream.Props["position"])
-	d := Display{ID: strconv.FormatUint(uint64(stream.Node), 10), Name: "Portal 授权显示器", Primary: primary, LogicalBounds: Bounds{float64(x), float64(y), float64(w), float64(h)}, AbsoluteInput: ok && w > 0 && h > 0}
+	d := Display{ID: strconv.FormatUint(uint64(stream.Node), 10), Name: "Portal-authorized display", Primary: primary, LogicalBounds: Bounds{float64(x), float64(y), float64(w), float64(h)}, AbsoluteInput: ok && w > 0 && h > 0}
 	return d
 }
 func (d *waylandDesktop) Capabilities() Capabilities {
@@ -374,7 +374,7 @@ func (d *waylandDesktop) Capabilities() Capabilities {
 			if caps.Reasons == nil {
 				caps.Reasons = map[string]string{}
 			}
-			caps.Reasons["text"] = "Portal尚未提供当前剪贴板格式；默认保护模式需等待正常复制产生所有权通知"
+			caps.Reasons["text"] = "The Portal has not provided the current clipboard formats; default preservation requires an ownership notification from a normal copy operation"
 		}
 	}
 	return caps
@@ -386,7 +386,7 @@ func (d *waylandDesktop) Err() error {
 	if d.healthErr != nil {
 		return d.healthErr
 	}
-	return failure("session_closed", "桌面授权会话已关闭")
+	return failure("session_closed", "The authorized desktop session is closed")
 }
 func (d *waylandDesktop) watch() {
 	defer d.wg.Done()
@@ -395,15 +395,15 @@ func (d *waylandDesktop) watch() {
 		case <-d.life.Done():
 			return
 		case <-d.conn.Context().Done():
-			d.invalidate(failure("session_closed", "桌面会话总线断开"))
+			d.invalidate(failure("session_closed", "Desktop session bus was disconnected"))
 			return
 		case signal, ok := <-d.signals:
 			if !ok {
-				d.invalidate(failure("session_closed", "桌面会话总线断开"))
+				d.invalidate(failure("session_closed", "Desktop session bus was disconnected"))
 				return
 			}
 			if signal.Path == d.path && signal.Name == "org.freedesktop.portal.Session.Closed" {
-				d.invalidate(failure("session_closed", "本机桌面授权已撤销"))
+				d.invalidate(failure("session_closed", "Local desktop authorization was revoked"))
 				return
 			}
 			if d.layoutSignal(signal) {
@@ -431,7 +431,7 @@ func (d *waylandDesktop) Displays(ctx context.Context) ([]Display, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.closed {
-		return nil, failure("session_closed", "桌面授权已失效")
+		return nil, failure("session_closed", "Desktop authorization is no longer valid")
 	}
 	return append([]Display{}, d.displays...), nil
 }
@@ -470,18 +470,18 @@ func runGStreamer(ctx context.Context, fd *os.File, node uint32, maxBytes, maxPi
 		if errors.As(err, &e) {
 			return Frame{}, e
 		}
-		return Frame{}, failure("capture_failed", "PipeWire 截图采集失败")
+		return Frame{}, failure("capture_failed", "PipeWire screenshot capture failed")
 	}
 	info, err := png.DecodeConfig(bytes.NewReader(output.Bytes()))
 	if err != nil {
-		return Frame{}, failure("capture_failed", "采集器未返回有效 PNG")
+		return Frame{}, failure("capture_failed", "The capture process did not return a valid PNG")
 	}
 	if err := checkPixels(info.Width, info.Height, maxPixels); err != nil {
 		return Frame{}, err
 	}
 	img, err := png.Decode(bytes.NewReader(output.Bytes()))
 	if err != nil {
-		return Frame{}, failure("capture_failed", "采集器 PNG 解码失败")
+		return Frame{}, failure("capture_failed", "Failed to decode the captured PNG")
 	}
 	// 一次新建流的第一帧可能是合成器的最新静态帧，无法获得媒体原始时间戳，不能声称为新渲染帧。
 	return Frame{Image: img, CapturedAt: output.received, Freshness: "latest_available"}, nil
@@ -492,14 +492,14 @@ func (d *waylandDesktop) Capture(ctx context.Context, display Display) (Frame, e
 	closed := d.closed
 	d.mu.Unlock()
 	if closed {
-		return Frame{}, failure("session_closed", "桌面授权已失效")
+		return Frame{}, failure("session_closed", "Desktop authorization is no longer valid")
 	}
 	if !ok {
-		return Frame{}, failure("not_found", "显示器未获授权")
+		return Frame{}, failure("not_found", "Display is not authorized")
 	}
 	var fd dbus.UnixFD
 	if err := d.conn.Object(portalName, portalPath).CallWithContext(ctx, screenInterface+".OpenPipeWireRemote", 0, d.path, map[string]dbus.Variant{}).Store(&fd); err != nil {
-		return Frame{}, failure("capture_failed", "无法获取授权 PipeWire 连接")
+		return Frame{}, failure("capture_failed", "Unable to obtain the authorized PipeWire connection")
 	}
 	file := os.NewFile(uintptr(fd), "portal-pipewire")
 	defer file.Close()
@@ -519,7 +519,7 @@ func (d *waylandDesktop) Capture(ctx context.Context, display Display) (Frame, e
 			d.displays[i].PixelHeight = frame.Image.Bounds().Dy()
 			if old.PixelWidth > 0 && (old.PixelWidth != d.displays[i].PixelWidth || old.PixelHeight != d.displays[i].PixelHeight) {
 				d.displays[i].AbsoluteInput = false
-				d.caps.Reasons["mouse"] = "媒体布局发生变化，需重新授权以建立可靠映射"
+				d.caps.Reasons["mouse"] = "The media layout changed; authorize again to establish a reliable mapping"
 			}
 		}
 	}
@@ -533,7 +533,7 @@ func (d *waylandDesktop) notify(ctx context.Context, method string, args ...any)
 	closed := d.closed
 	d.mu.Unlock()
 	if closed {
-		return failure("session_closed", "桌面授权已失效")
+		return failure("session_closed", "Desktop authorization is no longer valid")
 	}
 	base := []any{d.path, map[string]dbus.Variant{}}
 	var heldID string
@@ -547,7 +547,7 @@ func (d *waylandDesktop) notify(ctx context.Context, method string, args ...any)
 		}
 	}
 	if err := d.conn.Object(portalName, portalPath).CallWithContext(ctx, remoteInterface+"."+method, 0, append(base, args...)...).Err; err != nil {
-		return failure("input_failed", "Portal 输入事件提交失败")
+		return failure("input_failed", "Failed to submit a Portal input event")
 	}
 	if heldID != "" && args[1].(uint32) == 0 {
 		delete(d.held, heldID)
@@ -559,7 +559,7 @@ func (d *waylandDesktop) Mouse(ctx context.Context, ev MouseEvent) error {
 	node, ok := d.nodes[ev.Display.ID]
 	d.mu.Unlock()
 	if !ok {
-		return failure("not_found", "显示器未获授权")
+		return failure("not_found", "Display is not authorized")
 	}
 	return performMouse(ctx, ev, func(ctx context.Context, p Point) error {
 		return d.notify(ctx, "NotifyPointerMotionAbsolute", node, p.X, p.Y)
@@ -599,7 +599,7 @@ func keysyms(keys []string) (map[string]uint32, error) {
 			}
 		}
 		if code == 0 {
-			return nil, failure("unsupported", "后端不支持该按键")
+			return nil, failure("unsupported", "The backend does not support this key")
 		}
 		out[k] = code
 	}
@@ -620,7 +620,7 @@ func (d *waylandDesktop) Key(ctx context.Context, keys []string) error {
 }
 func (d *waylandDesktop) Text(ctx context.Context, in TextInput) (InputResult, error) {
 	if in.Mode != "clipboard" {
-		return InputResult{}, failure("unsupported", "Wayland Notify 不提供直接文本输入")
+		return InputResult{}, failure("unsupported", "Wayland Notify does not support direct text input")
 	}
 	if len(in.PasteKeys) == 0 {
 		in.PasteKeys = []string{"Ctrl", "V"}
@@ -645,7 +645,7 @@ func (d *waylandDesktop) Close() error {
 			method = "NotifyPointerButton"
 		}
 		if e := d.conn.Object(portalName, portalPath).CallWithContext(cleanup, remoteInterface+"."+method, 0, d.path, map[string]dbus.Variant{}, code, uint32(0)).Err; e != nil {
-			cleanupErr = failure("input_failed", "桌面连接失效后未能确认按键及按钮释放")
+			cleanupErr = failure("input_failed", "Unable to confirm key and button release after the desktop connection failed")
 		}
 	}
 	d.held = nil
@@ -653,7 +653,7 @@ func (d *waylandDesktop) Close() error {
 		if e := d.conn.Object(portalName, d.path).CallWithContext(cleanup, "org.freedesktop.portal.Session.Close", 0).Err; e != nil {
 			var remote dbus.Error
 			if cleanupErr == nil && (!errors.As(e, &remote) || remote.Name != "org.freedesktop.DBus.Error.UnknownObject") {
-				cleanupErr = failure("session_closed", "桌面授权关闭未获确认")
+				cleanupErr = failure("session_closed", "Closing desktop authorization was not confirmed")
 			}
 		}
 	}
@@ -693,7 +693,7 @@ func fdRead(ctx context.Context, file *os.File, max int) ([]byte, error) {
 		n, err := unix.Read(fd, buf)
 		if n > 0 {
 			if n > max-len(result) {
-				return nil, failure("limit_exceeded", "剪贴板快照超过限制")
+				return nil, failure("limit_exceeded", "The clipboard snapshot exceeds the byte limit")
 			}
 			result = append(result, buf[:n]...)
 		}

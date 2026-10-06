@@ -58,7 +58,7 @@ func NewWithBackend(cfg Config, backend Backend) (*Manager, error) {
 		return nil, err
 	}
 	if backend == nil {
-		return nil, failure("invalid_argument", "GUI 后端不能为空")
+		return nil, failure("invalid_argument", "GUI backend must not be nil")
 	}
 	m := &Manager{cfg: cfg, backend: backend, sessions: map[string]*session{}, requests: map[string]string{}, stop: make(chan struct{}), shutdownDone: make(chan struct{})}
 	m.wg.Add(1)
@@ -68,7 +68,7 @@ func NewWithBackend(cfg Config, backend Backend) (*Manager, error) {
 func randomID() string {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
-		panic("无法获取系统随机数")
+		panic("Unable to obtain system randomness")
 	}
 	return hex.EncodeToString(b[:])
 }
@@ -88,36 +88,36 @@ func setStatusError(s *Status, err error) {
 	if errors.As(err, &e) {
 		s.Code, s.Message = e.Code, e.Message
 	} else {
-		s.Code, s.Message = "session_closed", "图形会话失效"
+		s.Code, s.Message = "session_closed", "GUI session is no longer valid"
 	}
 }
 func (m *Manager) Open(ctx context.Context, in OpenInput) (Status, error) {
 	if len(in.RequestID) < 1 || len(in.RequestID) > 256 || strings.TrimSpace(in.RequestID) != in.RequestID || in.WaitMS < 0 || in.WaitMS > 10000 {
-		return Status{}, failure("invalid_argument", "创建去重键或等待时间无效")
+		return Status{}, failure("invalid_argument", "Invalid request ID or wait time")
 	}
 	m.mu.Lock()
 	if m.closed {
 		m.mu.Unlock()
-		return Status{}, failure("session_closed", "GUI 管理器已关闭")
+		return Status{}, failure("session_closed", "GUI manager is closed")
 	}
 	var s *session
 	if id, ok := m.requests[in.RequestID]; ok {
 		s = m.sessions[id]
 		if s.request != in {
 			m.mu.Unlock()
-			return Status{}, failure("conflict", "同一创建去重键的参数不同")
+			return Status{}, failure("conflict", "The same request ID was used with different parameters")
 		}
 	} else {
 		for _, existing := range m.sessions {
 			if existing.status.State == "ready" || existing.status.State == "authorizing" || existing.status.State == "closing" {
 				m.mu.Unlock()
-				return Status{}, failure("busy", "当前桌面已有图形会话")
+				return Status{}, failure("busy", "The current desktop already has a GUI session")
 			}
 		}
 		m.trimLocked(time.Now())
 		if len(m.sessions) >= m.cfg.MaxRecords {
 			m.mu.Unlock()
-			return Status{}, failure("limit_exceeded", "GUI 资源记录已达上限")
+			return Status{}, failure("limit_exceeded", "GUI resource record limit reached")
 		}
 		lifetime, cancel := context.WithCancel(context.Background())
 		s = &session{status: Status{ID: randomID(), State: "authorizing", Displays: []Display{}}, request: in, ctx: lifetime, cancel: cancel, opened: make(chan struct{}), closeDone: make(chan struct{}), lastUsed: time.Now(), captures: map[string]captureRecord{}}
@@ -172,9 +172,9 @@ func (m *Manager) authorize(s *session) {
 		}
 		if ctx.Err() != nil {
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				err = failure("authorization_timeout", "图形桌面授权超时")
+				err = failure("authorization_timeout", "Desktop authorization timed out")
 			} else {
-				err = failure("authorization_cancelled", "图形桌面授权已取消")
+				err = failure("authorization_cancelled", "Desktop authorization was cancelled")
 			}
 		}
 		m.mu.Lock()
@@ -235,7 +235,7 @@ func (m *Manager) Status(ctx context.Context, in StatusInput) (Status, error) {
 	s := m.sessions[in.ID]
 	if s == nil {
 		m.mu.Unlock()
-		return Status{}, failure("not_found", "图形会话不存在")
+		return Status{}, failure("not_found", "GUI session not found")
 	}
 	s.lastUsed = time.Now()
 	refresh := s.status.State == "ready" && !s.busy
@@ -267,13 +267,13 @@ func (m *Manager) CloseSession(ctx context.Context, in IDInput) (Status, error) 
 	s := m.sessions[in.ID]
 	m.mu.Unlock()
 	if s == nil {
-		return Status{}, failure("not_found", "图形会话不存在")
+		return Status{}, failure("not_found", "GUI session not found")
 	}
 	m.startClose(s, true)
 	select {
 	case <-s.closeDone:
 		if s.closeErr != nil {
-			return Status{}, failure("session_closed", "图形会话资源清理失败")
+			return Status{}, failure("session_closed", "Failed to clean up GUI session resources")
 		}
 		m.mu.Lock()
 		out := copyStatus(s.status)
@@ -309,7 +309,7 @@ func (m *Manager) startClose(s *session, explicit bool) {
 				s.status.State = "closed"
 			}
 			if s.closeErr != nil {
-				setStatusError(&s.status, failure("session_closed", "图形会话资源清理失败"))
+				setStatusError(&s.status, failure("session_closed", "Failed to clean up GUI session resources"))
 			}
 			m.mu.Unlock()
 			close(s.closeDone)
@@ -320,7 +320,7 @@ func (m *Manager) closeResource(s *session, explicit bool) error {
 	m.startClose(s, explicit)
 	<-s.closeDone
 	if s.closeErr != nil {
-		return failure("session_closed", "图形会话资源清理失败")
+		return failure("session_closed", "Failed to clean up GUI session resources")
 	}
 	return nil
 }
@@ -411,15 +411,15 @@ func run[T any](m *Manager, ctx context.Context, id string, input bool, fn func(
 	s := m.sessions[id]
 	if s == nil {
 		m.mu.Unlock()
-		return zero, failure("not_found", "图形会话不存在")
+		return zero, failure("not_found", "GUI session not found")
 	}
 	if s.status.State != "ready" {
 		m.mu.Unlock()
-		return zero, failure("session_closed", "图形会话尚未就绪或已经关闭")
+		return zero, failure("session_closed", "GUI session is not ready or has already closed")
 	}
 	if s.busy {
 		m.mu.Unlock()
-		return zero, failure("busy", "图形会话正在执行另一个操作")
+		return zero, failure("busy", "GUI session is running another operation")
 	}
 	s.busy = true
 	s.lastUsed = time.Now()
@@ -437,12 +437,12 @@ func run[T any](m *Manager, ctx context.Context, id string, input bool, fn func(
 	go func() {
 		out, err := fn(opctx, s)
 		if errors.Is(err, context.Canceled) {
-			err = failure("authorization_cancelled", "GUI 调用已取消")
+			err = failure("authorization_cancelled", "GUI call was cancelled")
 			if input {
 				err = partialError(err)
 			}
 		} else if errors.Is(err, context.DeadlineExceeded) {
-			err = failure("timeout", "GUI 操作等待超时")
+			err = failure("timeout", "Timed out waiting for the GUI operation")
 			if input {
 				err = partialError(err)
 			}
@@ -499,14 +499,14 @@ func (b *limitedBuffer) Bytes() []byte { return b.buffer.Bytes() }
 
 func (b *limitedBuffer) Write(p []byte) (int, error) {
 	if len(p) > b.limit-b.Len() {
-		return 0, failure("limit_exceeded", "PNG 截图字节超过限制")
+		return 0, failure("limit_exceeded", "PNG screenshot exceeds the byte limit")
 	}
 	return b.buffer.Write(p)
 }
 func (m *Manager) Screenshot(ctx context.Context, in ScreenshotInput) (ScreenshotResult, error) {
 	return run(m, ctx, in.ID, false, func(ctx context.Context, s *session) (ScreenshotResult, error) {
 		if !s.desktop.Capabilities().Screenshot {
-			return ScreenshotResult{}, failure("unsupported", "当前会话没有截图能力")
+			return ScreenshotResult{}, failure("unsupported", "Screenshot capture is not available in this session")
 		}
 		displays, err := m.refresh(ctx, s)
 		if err != nil {
@@ -522,15 +522,15 @@ func (m *Manager) Screenshot(ctx context.Context, in ScreenshotInput) (Screensho
 			}
 		}
 		if d.ID == "" {
-			return ScreenshotResult{}, failure("not_found", "显示器不存在或未获授权")
+			return ScreenshotResult{}, failure("not_found", "Display not found or not authorized")
 		}
 		if in.Region != nil {
 			r := *in.Region
 			if r.X < 0 || r.Y < 0 || r.Width <= 0 || r.Height <= 0 {
-				return ScreenshotResult{}, failure("invalid_argument", "截图区域无效")
+				return ScreenshotResult{}, failure("invalid_argument", "Invalid screenshot region")
 			}
 			if d.PixelWidth > 0 && (r.X > d.PixelWidth-r.Width || r.Y > d.PixelHeight-r.Height) {
-				return ScreenshotResult{}, failure("invalid_argument", "截图区域超出显示器")
+				return ScreenshotResult{}, failure("invalid_argument", "Screenshot region is outside the display")
 			}
 		}
 		if d.PixelWidth > 0 {
@@ -543,7 +543,7 @@ func (m *Manager) Screenshot(ctx context.Context, in ScreenshotInput) (Screensho
 			return ScreenshotResult{}, err
 		}
 		if frame.Image == nil {
-			return ScreenshotResult{}, failure("capture_failed", "后端未返回截图")
+			return ScreenshotResult{}, failure("capture_failed", "The backend did not return a screenshot")
 		}
 		bounds := frame.Image.Bounds()
 		w, h := bounds.Dx(), bounds.Dy()
@@ -551,7 +551,7 @@ func (m *Manager) Screenshot(ctx context.Context, in ScreenshotInput) (Screensho
 			return ScreenshotResult{}, err
 		}
 		if frame.CapturedAt.IsZero() || frame.Freshness == "" {
-			return ScreenshotResult{}, failure("capture_failed", "截图缺少可靠采集时间")
+			return ScreenshotResult{}, failure("capture_failed", "The screenshot has no reliable capture timestamp")
 		}
 		// 后端必须同时更新实际媒体尺寸，否则旧尺寸不能作为输入映射依据。
 		displays, err = m.refresh(ctx, s)
@@ -567,28 +567,28 @@ func (m *Manager) Screenshot(ctx context.Context, in ScreenshotInput) (Screensho
 			}
 		}
 		if !foundDisplay {
-			return ScreenshotResult{}, failure("capture_failed", "采集期间所选显示器已移除，请重新选择显示器")
+			return ScreenshotResult{}, failure("capture_failed", "The selected display was removed during capture; select a display again")
 		}
 		if d.PixelWidth != w || d.PixelHeight != h {
-			return ScreenshotResult{}, failure("capture_failed", "截图尺寸与当前显示器布局不一致，请重试")
+			return ScreenshotResult{}, failure("capture_failed", "Screenshot dimensions do not match the current display layout; try again")
 		}
 		region := Rect{Width: w, Height: h}
 		if in.Region != nil {
 			region = *in.Region
 			if region.X > w-region.Width || region.Y > h-region.Height {
-				return ScreenshotResult{}, failure("invalid_argument", "截图区域超出实际画面")
+				return ScreenshotResult{}, failure("invalid_argument", "Screenshot region is outside the captured frame")
 			}
 		}
 		crop := image.NewRGBA(image.Rect(0, 0, region.Width, region.Height))
 		draw.Draw(crop, crop.Bounds(), frame.Image, bounds.Min.Add(image.Pt(region.X, region.Y)), draw.Src)
 		encoded := &limitedBuffer{limit: m.cfg.MaxPNGBytes}
 		if err := png.Encode(encoded, crop); err != nil {
-			return ScreenshotResult{}, failure("limit_exceeded", "PNG 截图编码超过限制")
+			return ScreenshotResult{}, failure("limit_exceeded", "Encoded PNG screenshot exceeds the byte limit")
 		}
 		m.mu.Lock()
 		defer m.mu.Unlock()
 		if s.status.State != "ready" {
-			return ScreenshotResult{}, failure("session_closed", "采集期间会话已关闭")
+			return ScreenshotResult{}, failure("session_closed", "The session closed during capture")
 		}
 		s.sequence++
 		meta := CaptureMetadata{ID: s.status.ID, CaptureID: randomID(), DisplayID: d.ID, Width: region.Width, Height: region.Height, Region: region, LogicalBounds: d.LogicalBounds, LayoutGeneration: s.status.LayoutGeneration, CapturedAt: frame.CapturedAt, FrameSequence: s.sequence, Freshness: frame.Freshness}
@@ -616,20 +616,20 @@ func validPoint(x, y float64, w, h int) bool {
 }
 func (m *Manager) Mouse(ctx context.Context, in MouseInput) (InputResult, error) {
 	if in.Action != "move" && in.Action != "click" && in.Action != "double_click" && in.Action != "drag" && in.Action != "scroll" {
-		return InputResult{}, failure("invalid_argument", "未知鼠标操作")
+		return InputResult{}, failure("invalid_argument", "Unknown mouse action")
 	}
 	if in.Button == "" {
 		in.Button = "left"
 	}
 	if in.Button != "left" && in.Button != "middle" && in.Button != "right" {
-		return InputResult{}, failure("invalid_argument", "未知鼠标按钮")
+		return InputResult{}, failure("invalid_argument", "Unknown mouse button")
 	}
 	if in.DurationMS < 0 || in.DurationMS > 10000 || in.ScrollX < -1000 || in.ScrollX > 1000 || in.ScrollY < -1000 || in.ScrollY > 1000 {
-		return InputResult{}, failure("invalid_argument", "鼠标时长或滚动步数超出限制")
+		return InputResult{}, failure("invalid_argument", "Mouse duration or scroll count exceeds the limit")
 	}
 	return run(m, ctx, in.ID, true, func(ctx context.Context, s *session) (InputResult, error) {
 		if !s.desktop.Capabilities().Mouse {
-			return InputResult{}, failure("unsupported", "当前会话没有鼠标权限")
+			return InputResult{}, failure("unsupported", "Mouse input is not authorized in this session")
 		}
 		if _, err := m.refresh(ctx, s); err != nil {
 			return InputResult{}, err
@@ -639,13 +639,13 @@ func (m *Manager) Mouse(ctx context.Context, in MouseInput) (InputResult, error)
 		generation := s.status.LayoutGeneration
 		m.mu.Unlock()
 		if !ok || time.Now().After(c.expires) || c.meta.LayoutGeneration != generation {
-			return InputResult{}, failure("stale_capture", "截图坐标已过期或显示器布局已改变")
+			return InputResult{}, failure("stale_capture", "Screenshot coordinates have expired or the display layout has changed")
 		}
 		if !c.display.AbsoluteInput {
-			return InputResult{}, failure("unsupported", "显示器缺少可靠的绝对坐标映射")
+			return InputResult{}, failure("unsupported", "The display has no reliable absolute coordinate mapping")
 		}
 		if !validPoint(in.X, in.Y, c.meta.Width, c.meta.Height) || (in.Action == "drag" && !validPoint(in.EndX, in.EndY, c.meta.Width, c.meta.Height)) {
-			return InputResult{}, failure("invalid_argument", "输入点必须位于指定截图内")
+			return InputResult{}, failure("invalid_argument", "Input coordinates must be inside the specified screenshot")
 		}
 		convert := func(x, y float64) Point {
 			return Point{(x + float64(c.meta.Region.X)) * c.display.LogicalBounds.Width / float64(c.frameWidth), (y + float64(c.meta.Region.Y)) * c.display.LogicalBounds.Height / float64(c.frameHeight)}
@@ -667,7 +667,7 @@ func (m *Manager) Key(ctx context.Context, in KeyInput) (InputResult, error) {
 	}
 	return run(m, ctx, in.ID, true, func(ctx context.Context, s *session) (InputResult, error) {
 		if !s.desktop.Capabilities().Keyboard {
-			return InputResult{}, failure("unsupported", "当前会话没有键盘权限")
+			return InputResult{}, failure("unsupported", "Keyboard input is not authorized in this session")
 		}
 		if err := s.desktop.Key(ctx, keys); err != nil {
 			return InputResult{}, err
@@ -677,16 +677,16 @@ func (m *Manager) Key(ctx context.Context, in KeyInput) (InputResult, error) {
 }
 func (m *Manager) Text(ctx context.Context, in TextInput) (InputResult, error) {
 	if len(in.Text) > m.cfg.MaxTextBytes {
-		return InputResult{}, failure("limit_exceeded", "文本超过字节限制")
+		return InputResult{}, failure("limit_exceeded", "Text exceeds the byte limit")
 	}
 	if !utf8.ValidString(in.Text) || len(in.Text) == 0 {
-		return InputResult{}, failure("invalid_argument", "文本必须为非空 UTF-8 且不超过字节限制")
+		return InputResult{}, failure("invalid_argument", "Text must be nonempty UTF-8 and within the byte limit")
 	}
 	if in.Mode == "" {
 		in.Mode = "auto"
 	}
 	if in.Mode != "auto" && in.Mode != "direct" && in.Mode != "clipboard" {
-		return InputResult{}, failure("invalid_argument", "未知文本输入模式")
+		return InputResult{}, failure("invalid_argument", "Unknown text input mode")
 	}
 	if len(in.PasteKeys) > 0 {
 		keys, err := normalizeKeys(in.PasteKeys)
@@ -698,7 +698,7 @@ func (m *Manager) Text(ctx context.Context, in TextInput) (InputResult, error) {
 	return run(m, ctx, in.ID, true, func(ctx context.Context, s *session) (InputResult, error) {
 		caps := s.desktop.Capabilities()
 		if !caps.Text {
-			return InputResult{}, failure("unsupported", "当前会话没有文本输入能力")
+			return InputResult{}, failure("unsupported", "Text input is not available in this session")
 		}
 		if in.Mode == "auto" {
 			if caps.DirectText {
@@ -708,10 +708,10 @@ func (m *Manager) Text(ctx context.Context, in TextInput) (InputResult, error) {
 			}
 		}
 		if in.Mode == "direct" && !caps.DirectText {
-			return InputResult{}, failure("unsupported", "当前后端不支持直接文本输入")
+			return InputResult{}, failure("unsupported", "The current backend does not support direct text input")
 		}
 		if in.Mode == "clipboard" && !caps.Clipboard {
-			return InputResult{}, failure("unsupported", "当前后端不支持剪贴板输入")
+			return InputResult{}, failure("unsupported", "The current backend does not support clipboard input")
 		}
 		return s.desktop.Text(ctx, in)
 	})

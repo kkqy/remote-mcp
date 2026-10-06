@@ -354,7 +354,7 @@ func TestCLIRejectsExplicitInvalidTokenFile(t *testing.T) {
 	}
 	for _, path := range []string{"", file, filepath.Join(t.TempDir(), "missing")} {
 		var out, diagnostic bytes.Buffer
-		if run(context.Background(), []string{"upload", "--url", "http://127.0.0.1:1/mcp", "--token-file", path, "a", "b"}, &out, &diagnostic) == 0 || !bytes.Contains(diagnostic.Bytes(), []byte("Token 文件")) {
+		if run(context.Background(), []string{"upload", "--url", "http://127.0.0.1:1/mcp", "--token-file", path, "a", "b"}, &out, &diagnostic) == 0 || !bytes.Contains(bytes.ToLower(diagnostic.Bytes()), []byte("token file")) {
 			t.Fatal("显式凭据文件错误应在连接前报告", diagnostic.String())
 		}
 	}

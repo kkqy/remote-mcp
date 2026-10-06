@@ -23,7 +23,7 @@
 | `gui_key` | `id/keys` | 一次完整单键或组合键，自动释放本次按下的键。统一常用键名和修饰键，平台不支持的键明确失败。 |
 | `gui_text` | `id/text`、可选 `mode/paste_keys/allow_clipboard_replace` | UTF-8 文本；模式为 `auto/direct/clipboard`，显式替换默认关闭。结果报告文本提交模式与剪贴板恢复状态。 |
 
-- 工具结构通过 Go 类型定义 schema，使用中文描述；后端动作枚举、键名与边界由共享层验证。
+- 工具结构通过 Go 类型定义 schema，使用英文描述；后端动作枚举、键名与边界由共享层验证。设计文档和源码注释继续中文。
 - `gui_key` 不提供跨调用长按；拖拽需要的鼠标按住状态仅存在于一次有界调用内。
 - `gui_text` 的 `auto` 优先已探测并验证的直接文本能力，否则采用用户已认可的剪贴板兼容策略。未可靠保存旧内容前不修改剪贴板。
 - 普通应用默认粘贴组合键为 Windows/Linux 的 Ctrl+V、macOS 的 Meta+V；终端等不同目标由调用方指定 `paste_keys`，不猜测前台窗口或控件。
@@ -120,6 +120,8 @@
 错误码至少包含 `invalid_argument/unsupported/no_gui/permission_denied/dependency_missing/authorization_cancelled/authorization_timeout/session_closed/not_found/conflict/busy/stale_capture/capture_failed/timeout/limit_exceeded/input_failed/clipboard_preservation_unavailable/clipboard_restore_failed`，后续增加需同步契约与测试。部分能力失效与整体会话关闭应区分。
 
 沿用既有普通日志规则，只记录工具、耗时和结果。截图、文字、剪贴板、Portal 恢复令牌、D-Bus 原始敏感响应和辅助进程完整 stderr 不进入普通日志。
+
+2026-10-06 用户追加失败原因日志：在服务端统一 MCP receiving 中间件为失败调用增加安全的错误码和具体原因，兼容 `CallToolResult.IsError` 与返回 error 两条路径。业务错误保留具体英文原因；SDK 参数/协议或未知异常使用能定位类别的受控诊断，不能转储原始 error、请求参数或完整响应内容。日志长度与控制字符有边界，Token 非空时过滤凭据；日志功能自身不改变调用响应。用户随后要求所有程序错误和提示改为英文，该文案调整可以改变 message/description/help 文本，但保持错误码、JSON 字段和业务行为。
 
 ## 兼容、实施验证与回退
 

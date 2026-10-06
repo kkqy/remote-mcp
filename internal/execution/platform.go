@@ -20,11 +20,11 @@ type running interface {
 
 func command(name string, args []string, dir string, env map[string]string) (*exec.Cmd, error) {
 	if name == "" || strings.ContainsRune(name, 0) {
-		return nil, failure("invalid_argument", "可执行文件不能为空或包含零字节")
+		return nil, failure("invalid_argument", "The executable must not be empty or contain a NUL byte")
 	}
 	for _, arg := range args {
 		if strings.ContainsRune(arg, 0) {
-			return nil, failure("invalid_argument", "参数包含零字节")
+			return nil, failure("invalid_argument", "An argument contains a NUL byte")
 		}
 	}
 	cmd := exec.Command(name, args...)
@@ -41,7 +41,7 @@ func command(name string, args []string, dir string, env map[string]string) (*ex
 	}
 	for key, value := range env {
 		if key == "" || strings.ContainsAny(key, "=\x00") || strings.ContainsRune(value, 0) {
-			return nil, failure("invalid_argument", "环境变量格式无效")
+			return nil, failure("invalid_argument", "Invalid environment variable format")
 		}
 		if runtime.GOOS == "windows" {
 			key = strings.ToUpper(key)
