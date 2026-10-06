@@ -166,8 +166,8 @@ type Frame struct {
 }
 type Point struct{ X, Y float64 }
 
-// MouseEvent.X/Y 为显示器内的逻辑坐标；原生系统后端按需加 LogicalBounds 的桌面偏移。
-// Wayland 直接向授权流提交局部坐标。End 是拖拽终点。
+// MouseEvent.Start/End 为显示器内的逻辑坐标；Windows 后端加 LogicalBounds 的桌面偏移。
+// End 是拖拽终点。
 type MouseEvent struct {
 	Display          Display
 	Action, Button   string

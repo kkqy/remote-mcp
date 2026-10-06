@@ -12,7 +12,7 @@
 - 进程工具：`process_start/read/status/stop`。
 - 终端工具：`terminal_open/write/read/resize/status/close`。
 - 远程调试 P0 工具：`environment_inspect/process_inspect/network_listeners/network_probe`、`file_list/file_read/file_search/file_patch`、`log_open/log_read/log_close`；执行 read 新增 `wait_ms`，详细签名、预算和代际见 [远程调试 P0 契约](remote-debug.md)。
-- GUI 工具：`gui_status/open/close/screenshot/mouse/key/text`；图片、坐标、授权和剪贴板规则见 [GUI 契约](gui.md)。
+- Windows 专用 GUI 工具：`gui_status/open/close/screenshot/mouse/key/text`；图片、坐标及原生 Unicode 输入规则见 [GUI 契约](gui.md)。Linux 不注册 GUI 工具。
 - 本地辅助命令入口：`remote-mcp-transfer upload|download`，CLI 完整参数以程序 `--help` 和 README 为准。
 - Windows 执行适配入口：`(*windowsProcess).spawn(*exec.Cmd, []windows.Handle) error`；终端通过扩展属性指定 HPCON，普通进程通过句柄列表重定向标准输入输出。
 

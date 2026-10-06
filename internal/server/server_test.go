@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"remote-mcp/internal/config"
+	"remote-mcp/internal/gui"
 )
 
 const testToken = "fictional-server-test-token"
@@ -330,16 +331,25 @@ func TestAnonymousRunAndProtocol(t *testing.T) {
 	}
 	_, body = rpcWithToken(t, client, entry.URL, session, `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`, "")
 	tools := body["result"].(map[string]any)["tools"].([]any)
-	if len(tools) != 40 {
+	wantCount := 33
+	if gui.Supported {
+		wantCount += 7
+	}
+	if len(tools) != wantCount {
 		t.Fatal("匿名工具发现失败")
 	}
 	names := make(map[string]bool, len(tools))
 	for _, item := range tools {
 		names[item.(map[string]any)["name"].(string)] = true
 	}
-	for _, name := range []string{"file_stat", "process_start", "terminal_open", "port_forward_create", "gui_status", "gui_open", "gui_close", "gui_screenshot", "gui_mouse", "gui_key", "gui_text"} {
+	for _, name := range []string{"file_stat", "process_start", "terminal_open", "port_forward_create"} {
 		if !names[name] {
 			t.Fatal("匿名工具发现缺少工具", name)
+		}
+	}
+	for _, name := range []string{"gui_status", "gui_open", "gui_close", "gui_screenshot", "gui_mouse", "gui_key", "gui_text"} {
+		if names[name] != gui.Supported {
+			t.Fatal("匿名 GUI 工具发现与平台不符", name)
 		}
 	}
 	file := filepath.Join(t.TempDir(), "example.txt")

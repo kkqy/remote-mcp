@@ -49,9 +49,15 @@ type protocol struct {
 	url, token, session string
 	sequence            int
 	client              *http.Client
+	responseLimit       int64
 }
 
 func (p *protocol) rpc(method string, params object, notification bool) object {
+	return p.rpcContext(context.Background(), method, params, notification)
+}
+
+// GUI 只读截图等待共享截止时间；旧模式仍使用原来的 HTTP 客户端超时。
+func (p *protocol) rpcContext(ctx context.Context, method string, params object, notification bool) object {
 	defer func() {
 		if value := recover(); value != nil {
 			panic(fmt.Sprintf("RPC %s failed: %v", method, value))
@@ -64,7 +70,7 @@ func (p *protocol) rpc(method string, params object, notification bool) object {
 	}
 	body, err := json.Marshal(payload)
 	check(err)
-	request, err := http.NewRequest("POST", p.url, bytes.NewReader(body))
+	request, err := http.NewRequestWithContext(ctx, "POST", p.url, bytes.NewReader(body))
 	check(err)
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json, text/event-stream")
@@ -82,9 +88,13 @@ func (p *protocol) rpc(method string, params object, notification bool) object {
 	if session := response.Header.Get("Mcp-Session-Id"); session != "" {
 		p.session = session
 	}
-	raw, err := io.ReadAll(io.LimitReader(response.Body, 2*1024*1024+1))
+	limit := p.responseLimit
+	if limit == 0 {
+		limit = 2 * 1024 * 1024
+	}
+	raw, err := io.ReadAll(io.LimitReader(response.Body, limit+1))
 	check(err)
-	ensure(len(raw) <= 2*1024*1024 && utf8.Valid(raw), "Protocol response exceeded bounds or was not UTF-8")
+	ensure(int64(len(raw)) <= limit && utf8.Valid(raw), "Protocol response exceeded bounds or was not UTF-8")
 	if len(raw) == 0 {
 		return object{}
 	}
@@ -389,7 +399,7 @@ func inspection(p *protocol, pid int) {
 	failure := p.tool("network_probe", object{"mode": "tcp", "target": refused}, true)
 	ensure(failure["code"] == "tcp_failed" && failure["failed_stage"] == "tcp" && len(rows(failure["stages"])) >= 2, "Native TCP stages were lost")
 }
-func round(binaryDir, root, self, kind string, tokenMode bool) {
+func round(binaryDir, root, self, kind string, tokenMode bool) object {
 	token := ""
 	if tokenMode {
 		token = "fictional-native-" + filepath.Base(root)
@@ -397,6 +407,21 @@ func round(binaryDir, root, self, kind string, tokenMode bool) {
 	logPath := filepath.Join(root, "server.log")
 	log, err := os.Create(logPath)
 	check(err)
+	logClosed := false
+	closeLog := func() {
+		if !logClosed {
+			check(log.Close())
+		}
+	}
+	if kind == "gui" {
+		defer cleanupWithCause("service_log_cleanup", closeLog)
+	} else {
+		defer closeLog()
+	}
+	if kind == "gui" {
+		guiStage = "service_starting"
+		ensure(artifactHash(filepath.Join(binaryDir, "remote-mcp.exe")) == guiArtifacts["server_sha256"], "GUI server hash changed before startup")
+	}
 	command := exec.Command(filepath.Join(binaryDir, "remote-mcp.exe"), "--listen", "127.0.0.1:0")
 	command.Env = append(os.Environ(), "REMOTE_MCP_TOKEN="+token)
 	command.Stderr = log
@@ -404,18 +429,33 @@ func round(binaryDir, root, self, kind string, tokenMode bool) {
 	check(err)
 	check(command.Start())
 	done := make(chan error, 1)
-	stopped, logClosed := false, false
-	defer func() {
+	stopped := false
+	waitStopped := func() error {
+		if kind != "gui" {
+			return <-done
+		}
+		select {
+		case err := <-done:
+			return err
+		case <-time.After(5 * time.Second):
+			panic("GUI service cleanup timed out")
+		}
+	}
+	stopService := func() {
 		if !stopped {
-			if err := command.Process.Kill(); err != nil {
-				panic("Service cleanup failed")
+			select {
+			case <-done:
+			default:
+				check(command.Process.Kill())
+				waitStopped()
 			}
-			<-done
 		}
-		if !logClosed {
-			check(log.Close())
-		}
-	}()
+	}
+	if kind == "gui" {
+		defer cleanupWithCause("service_cleanup", stopService)
+	} else {
+		defer stopService()
+	}
 	go func() { done <- command.Wait() }()
 	startup := make(chan object, 1)
 	go func() {
@@ -457,6 +497,10 @@ func round(binaryDir, root, self, kind string, tokenMode bool) {
 	}
 	client := &http.Client{Timeout: 15 * time.Second, Transport: &http.Transport{Proxy: nil}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	p := &protocol{url: entry["url"].(string), token: token, client: client}
+	defer client.CloseIdleConnections()
+	if kind == "gui" {
+		p.responseLimit = 24 << 20
+	}
 	if tokenMode {
 		request, err := http.NewRequest("POST", p.url, strings.NewReader("{}"))
 		check(err)
@@ -468,8 +512,13 @@ func round(binaryDir, root, self, kind string, tokenMode bool) {
 	initialized := p.rpc("initialize", object{"protocolVersion": "2025-11-25", "capabilities": object{}, "clientInfo": object{"name": "independent-windows-native", "version": "1"}}, false)
 	ensure(initialized["protocolVersion"] == "2025-11-25", "Protocol mismatch")
 	p.rpc("notifications/initialized", object{}, true)
-	ensure(len(rows(p.rpc("tools/list", object{}, false)["tools"])) == 40, "Registered tool count mismatch")
-	if kind == "legacy" {
+	if kind != "gui" {
+		ensure(len(rows(p.rpc("tools/list", object{}, false)["tools"])) == 40, "Registered tool count mismatch")
+	}
+	var evidence object
+	if kind == "gui" {
+		evidence = guiSmoke(p)
+	} else if kind == "legacy" {
 		oldSmoke(p, root, filepath.Join(binaryDir, "remote-mcp-transfer.exe"))
 	} else {
 		files(p, root)
@@ -484,14 +533,14 @@ func round(binaryDir, root, self, kind string, tokenMode bool) {
 	default:
 	}
 	check(command.Process.Kill())
-	err = <-done
+	err = waitStopped()
 	stopped = true
 	ensure(err != nil && command.ProcessState.ExitCode() == 1, "Unexpected service termination")
 	check(log.Close())
 	logClosed = true
 	content := read(logPath)
 	ensure(utf8.Valid(content), "Ordinary log was not UTF-8")
-	for _, forbidden := range []string{token, root, "private-native-query", "新的中文行", "追加中文", "新代中文", "private-native-url", "private-native-wait-output"} {
+	for _, forbidden := range []string{token, root, "private-native-query", "新的中文行", "追加中文", "新代中文", "private-native-url", "private-native-wait-output", guiTestText} {
 		if forbidden != "" {
 			ensure(!bytes.Contains(content, []byte(forbidden)), "Ordinary log leaked credentials or content")
 		}
@@ -501,8 +550,10 @@ func round(binaryDir, root, self, kind string, tokenMode bool) {
 			ensure(bytes.Contains(content, []byte("error_code="+code)), "Failure diagnostics were missing")
 		}
 	}
+	return evidence
 }
 func main() {
+	guiMode := len(os.Args) > 2 && os.Args[2] == "--gui"
 	if len(os.Args) > 1 && os.Args[1] == "worker" {
 		put(os.Args[3], []byte("ready"))
 		waitFile(os.Args[2])
@@ -512,22 +563,48 @@ func main() {
 	}
 	defer func() {
 		if value := recover(); value != nil {
+			if guiMode {
+				json.NewEncoder(os.Stdout).Encode(guiFailureSummary())
+			}
 			fmt.Fprintln(os.Stderr, value)
 			os.Exit(1)
 		}
 	}()
-	ensure(runtime.GOOS == "windows" && len(os.Args) == 2, "Windows runner arguments were invalid")
+	ensure(runtime.GOOS == "windows" && (len(os.Args) == 2 || (guiMode && len(os.Args) == 5)), "Windows runner arguments were invalid")
 	base := os.Args[1]
 	self, err := os.Executable()
 	check(err)
+	if guiMode {
+		verifyGUIArtifacts(base, self, os.Args[3], os.Args[4])
+	}
 	results := []object{}
-	for _, kind := range []string{"legacy", "p0"} {
+	kinds := []string{"legacy", "p0"}
+	if guiMode {
+		kinds = []string{"gui"}
+	}
+	for _, kind := range kinds {
 		for _, enabled := range []bool{true, false} {
 			root, err := os.MkdirTemp(base, "round-")
 			check(err)
-			func() { defer func() { check(os.RemoveAll(root)) }(); round(base, root, self, kind, enabled) }()
-			results = append(results, object{"suite": kind, "authentication": map[bool]string{true: "token", false: "anonymous"}[enabled], "ok": true, "service_shutdown": "terminate_process"})
+			var evidence object
+			func() {
+				if guiMode {
+					defer cleanupWithCause("round_directory_cleanup", func() { check(os.RemoveAll(root)) })
+				} else {
+					defer func() { check(os.RemoveAll(root)) }()
+				}
+				evidence = round(base, root, self, kind, enabled)
+			}()
+			result := object{"suite": kind, "authentication": map[bool]string{true: "token", false: "anonymous"}[enabled], "ok": true, "service_shutdown": "terminate_process"}
+			if guiMode {
+				result["evidence"] = evidence
+			}
+			results = append(results, result)
 		}
+	}
+	if guiMode {
+		check(json.NewEncoder(os.Stdout).Encode(object{"ok": true, "platform": runtime.GOOS, "arch": runtime.GOARCH, "protocol_version": "2025-11-25", "gui_exercised": true, "artifacts": guiArtifacts, "clipboard_accessed": false, "acceptance_complete": false, "pending": []string{"multiple_displays_and_mixed_scaling", "layout_changes", "permission_revocation", "MCP_client_image_display"}, "rounds": results}))
+		return
 	}
 	check(json.NewEncoder(os.Stdout).Encode(object{"ok": true, "platform": runtime.GOOS, "arch": runtime.GOARCH, "protocol_version": "2025-11-25", "gui_exercised": false, "native_conpty": true, "inspection": true, "waiting_timeout": true, "waiting_exit": true, "log_rotation": true, "log_truncation": true, "hash_patch": true, "rounds": results}))
 }

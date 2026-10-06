@@ -113,7 +113,7 @@ Token 文件优先于环境变量，读取时去除文件首尾空白；显式�
 
 客户端通过 `tools/list` 获得完整的类型化参数。业务失败返回 MCP `isError` 和稳定错误码；不要把协议 HTTP 200 当作工具成功。
 
-MCP 工具失败的普通日志保留 `tool/elapsed/failed`，并输出 `error_code/error_message`，程序自有错误原因及提示使用英文；GUI 失败还可包含 `input_may_have_applied/clipboard_restore`。例如剪贴板恢复失败会保留受控的恢复原因和计数。成功调用没有错误字段。日志只接收已知内置工具域的安全业务说明；SDK 参数失败按必填缺失、类型不符等类别说明，未知工具和异常使用安全分类，不打印原始参数、内容或错误载荷。错误说明最多 1024 字节，控制字符清理，非空 Token 及可识别的输入内容脱敏；未来自定义工具需单独建立安全日志契约才能输出原文原因。
+MCP 工具失败的普通日志保留 `tool/elapsed/failed`，并输出 `error_code/error_message`，程序自有错误原因及提示使用英文；GUI 失败还可包含 `input_may_have_applied/clipboard_restore`。例如 Windows 显式请求剪贴板模式会返回 `unsupported`，并记录具体英文原因。成功调用没有错误字段。日志只接收已知内置工具域的安全业务说明；SDK 参数失败按必填缺失、类型不符等类别说明，未知工具和异常使用安全分类，不打印原始参数、内容或错误载荷。错误说明最多 1024 字节，控制字符清理，非空 Token 及可识别的输入内容脱敏；未来自定义工具需单独建立安全日志契约才能输出原文原因。
 
 
 | 工具 | 用途 |
@@ -328,40 +328,23 @@ python3 scripts/windows-native-smoke.py \
 
 该脚本只使用唯一临时目录和独立回环服务，完成后清理并重新确认原入口可用，保留原服务与配置。`--skip-package-tests` 仅跑四轮服务闭环；可重复 `--package` 选择包，`--package-only` 仅跑包测试，其报告 `protocol_smoke=false`，不能代表四轮成功。报告只含有限检查结果与上传产物哈希，不记录凭据、目录或用户内容。
 
-## 图形桌面截图与操作
+## Windows 图形桌面截图与操作
 
-GUI 工具使用原有 `/mcp` 入口、匿名或可选 Token 模式，只操作服务运行账号的当前用户图形桌面。请在已登录的图形会话中启动服务；SSH、后台系统服务、锁屏或安全桌面不保证有可访问的图形会话。匿名模式下，能够连接服务的客户端也可申请桌面操作。GUI 依赖或权限缺失只影响 GUI 工具，文件、进程、终端和转发仍可使用。
+图形操作仅支持 Windows。Linux 保留文件、进程、PTY 终端、TCP 转发及远程调试工具，不提供 `gui_*` 工具或 `gui-*` 启动参数。
+
+Windows GUI 使用原有 `/mcp` 入口、匿名或可选 Token 模式，只操作服务运行账号的当前交互桌面。请在已登录的图形会话中启动服务；后台服务、锁屏和安全桌面不保证可访问。系统 UIPI 可能拒绝向更高权限的应用输入。匿名模式下，能够连接服务的客户端也可申请桌面操作；桌面不可用不影响其他工具启动。
 
 | 工具 | 参数与用途 |
 | --- | --- |
-| `gui_status` | `{}` 只读查询后端及能力，不弹出授权；`{"id":"会话 ID"}` 查询状态、获授权显示器及缺失能力原因 |
-| `gui_open` | `{"request_id":"desktop-001","wait_ms":10000}` 创建当前用户图形会话；状态为 `authorizing` 时继续查询 `gui_status` |
-| `gui_close` | `{"id":"会话 ID"}` 释放桌面资源；记录保留期内允许重复关闭 |
-| `gui_screenshot` | `id`、可选 `display_id` 与 `region`，获取整显示器或区域 PNG |
-| `gui_mouse` | `id/capture_id/action/x/y`，支持 `move/click/double_click/drag/scroll`；拖拽增加 `end_x/end_y/duration_ms`，滚动增加 `scroll_x/scroll_y` |
-| `gui_key` | `{"id":"会话 ID","keys":["Ctrl","V"]}` 单键或组合键，一次调用自动释放本次按下的键 |
-| `gui_text` | `id/text` 与可选 `mode/paste_keys/allow_clipboard_replace`，提交 UTF-8 文本，包括中文 |
+| `gui_status` | `{}` 只读查询后端及能力；`{"id":"会话 ID"}` 查询会话、显示器及不可用原因 |
+| `gui_open` | `{"request_id":"desktop-001","wait_ms":10000}` 创建当前用户图形会话 |
+| `gui_close` | `{"id":"会话 ID"}` 释放资源；记录保留期内允许重复关闭 |
+| `gui_screenshot` | `id`、可选 `display_id/region`，获取整显示器或区域 PNG |
+| `gui_mouse` | `id/capture_id/action/x/y`；支持移动、点击、双击、拖拽、横纵滚动 |
+| `gui_key` | `{"id":"会话 ID","keys":["Ctrl","A"]}` 单键或组合键，自动释放本次按下的键 |
+| `gui_text` | `id/text` 与可选 `mode/paste_keys/allow_clipboard_replace`，提交 UTF-8 文本，包括中文和 emoji |
 
-会话按 `request_id` 去重；同 ID、不同参数返回 `conflict`。一次服务最多一个待授权或可操作的图形会话，输入正在执行时返回 `busy`。HTTP/MCP 断线不会销毁图形资源；默认无调用活动 30 分钟回收。服务正常退出释放桌面、辅助采集进程和句柄，服务重启后旧 ID 失效。
-
-### 授权与平台依赖
-
-- **Windows**：当前交互桌面上的原生截图与输入。系统的 UIPI 权限限制可能拒绝对更高权限应用输入；不控制安全桌面或 Windows 服务会话。
-- **Linux X11**：运行账号需要连接当前 X 显示服务器，并具备 XTEST 输入扩展。能力以实际连接及扩展探测为准。
-- **Linux Wayland**：首版完整操作目标为 GNOME/Mutter 和 KDE Plasma/KWin。需要当前用户会话 D-Bus、PipeWire、`xdg-desktop-portal` 及与桌面匹配的 GNOME/KDE Portal 后端，并安装 `gst-launch-1.0`、`gst-inspect-1.0` 和 `pipewiresrc/videoconvert/pngenc/fdsink` 插件。Go 二进制仍无需 CGO，桌面采集依赖系统组件。
-
-Wayland 首次打开或授权失效时，目标机用户需在系统 Portal 对话框选择屏幕并确认输入权限；用户可以取消或撤销。工具只列出实际可访问或获授权的显示器和设备，不把请求的权限当作已经获授予。运行期间复用已授权会话，不把恢复令牌写盘；不能承诺重启后永久免提示。
-
-Wayland 的 Portal 包名随发行版不同。Debian/Ubuntu 系可核对 `xdg-desktop-portal-gnome` 或 `xdg-desktop-portal-kde`、`gstreamer1.0-pipewire`、`gstreamer1.0-tools`、`gstreamer1.0-plugins-base`、`gstreamer1.0-plugins-good`；其他发行版安装提供相同命令和插件的包。用以下命令确认运行组件：
-
-```sh
-gst-inspect-1.0 pipewiresrc
-gst-inspect-1.0 videoconvert
-gst-inspect-1.0 pngenc
-gst-inspect-1.0 fdsink
-```
-
-GNOME/KDE 的实际版本、权限和插件组合仍须逐台核验；基础服务的系统下限不等于 GUI 的兼容下限。Sway、Hyprland 等其他 Wayland 桌面按实际 Portal 能力报告，不保证完整输入控制；XWayland 窗口可用也不能证明原生 Wayland 桌面完整可控。缺失依赖、无图形会话或无权限时，检查 `gui_status` 的能力及原因。
+会话按 `request_id` 去重；同 ID、不同参数返回 `conflict`。一次服务最多一个待授权或可操作会话，操作正在执行时返回 `busy`。HTTP/MCP 断线不会销毁图形资源；默认无调用活动 30 分钟回收。正常退出释放桌面句柄，重启后旧 ID 失效。
 
 ### 截图与坐标
 
@@ -371,31 +354,27 @@ GNOME/KDE 的实际版本、权限和插件组合仍须逐台核验；基础服�
 {"id":"会话 ID","display_id":"显示器 ID","region":{"x":100,"y":80,"width":640,"height":480}}
 ```
 
-省略 `display_id` 时选择默认或首个获授权显示器，省略 `region` 时获取整个显示器。截图不缩放，不拼接全部桌面，也不按窗口专用捕获。返回一个标准 MCP `image` 内容块（`mimeType: "image/png"`），以及 `structuredContent` 中的 `capture_id/display_id/width/height/region/logical_bounds/layout_generation/captured_at/captured_at_source/frame_sequence/freshness`。图片展示需要客户端支持 MCP 图片内容；结构化结果不重复完整 PNG。
+省略 `display_id` 时选择默认或首个显示器，省略 `region` 时获取整个显示器。截图不缩放、不拼接全部桌面。返回一个标准 MCP `image` 内容块（`mimeType: "image/png"`），以及 `structuredContent` 中的 `capture_id/display_id/width/height/region/logical_bounds/layout_generation/captured_at/captured_at_source/frame_sequence/freshness`。结构化结果不重复 PNG，图片展示需要客户端支持 MCP 图片内容。
 
-鼠标坐标以**返回截图内部像素**为单位，左上角为 `(0,0)`。例如在上述区域图的 `(120,50)` 单击：
+鼠标坐标以返回截图内部像素为单位，左上角为 `(0,0)`。例如在上述区域图的 `(120,50)` 单击：
 
 ```json
 {"id":"会话 ID","capture_id":"本次截图 ID","action":"click","x":120,"y":50,"button":"left"}
 ```
 
-由服务加入区域偏移并转换到显示器逻辑坐标，调用方不再自行加桌面原点或缩放。拖拽终点也相对同一截图。多屏、负桌面坐标和混合缩放依赖实际显示器映射；布局改变、记录到期或被淘汰后，旧截图输入返回 `stale_capture`，应重新截图定位。
+服务加入裁剪偏移并按实际显示器映射转换，调用方不再自行加桌面原点或缩放。拖拽终点相对同一截图。多屏、负桌面坐标和 DPI 使用实际映射；布局改变、记录到期或淘汰后返回 `stale_capture`，应重新截图定位。
 
-输入结果的 `submitted` 仅表示事件已提交；应用是否接受、文字是否进入控件，应再次截图核对。`freshness` 与 `captured_at_source` 说明时间来源和新鲜度。原生采集的 `captured_at_source` 为 `acquired_at`；Wayland GStreamer PNG 没有源帧时间戳，标记为 `received_at` 和 `latest_available`，`captured_at` 表示首帧接收时间，不能据此保证源画面已经在输入之后渲染。等待有上限，不把调用返回时间当作源画面采集时间。输入取消或失败可能已经产生部分操作，`input_may_have_applied` 用于提示这一情况，不应盲目重试。
+原生截图的 `captured_at_source` 为 `acquired_at`。输入结果的 `submitted` 仅表示事件提交，应用是否接受应再次截图或检查实际控件。取消或失败可能已经产生部分输入，结果中的 `input_may_have_applied` 提示这一情况，不应盲目重试。
 
-Wayland 的绝对坐标还要求可用的逻辑布局监视器：GNOME 使用 Mutter DisplayConfig 的 `MonitorsChanged`，KDE 使用实际可读取的 KScreen `getConfig/configChanged`。逻辑缩放或排列变化、监视服务断线或不可用时，会关闭当前绝对输入映射，旧截图不能继续定位；需 `gui_close` 后重新 `gui_open` 授权。媒体像素尺寸不变也不能证明逻辑布局未变。KDE 上游接口会演进，不能将旧 KScreen D-Bus 路线视为所有版本通用；能力以运行时探测为准。
-
-### 中文输入与剪贴板
+### 中文输入与限制
 
 ```json
-{"id":"会话 ID","text":"你好，图形桌面","mode":"auto"}
+{"id":"会话 ID","text":"你好，图形桌面 😀","mode":"auto"}
 ```
 
-`mode` 为 `auto/direct/clipboard`；默认 `auto` 优先直接文本输入，否则采用剪贴板粘贴。Windows 当前使用原生 Unicode 输入，显式 `clipboard` 模式返回 `unsupported`；各后端实际能力见 `gui_status`。兼容模式先可靠保存原内容及 MIME 信息，粘贴后恢复；默认 `allow_clipboard_replace: false`。无法可靠保留时返回 `clipboard_preservation_unavailable`，不会直接覆盖剪贴板。明确接受替换时可设为 `true`，结果会标明替换与恢复状态。发现其他应用已经改变剪贴板时不覆盖其新内容；恢复失败明确报告，不把部分输入失败包装为无副作用。
+Windows 的 `auto/direct` 使用原生 Unicode 输入，不读取或修改剪贴板。显式 `mode: "clipboard"` 返回 `unsupported`；保留的粘贴相关参数不代表支持剪贴板模式。普通日志不记录图片或输入文字。
 
-部分 KDE Portal 在授权开始时仅订阅后续剪贴板变更，不发送现有格式；Clipboard v1 也没有查询全部现有格式的接口。此时默认输入返回 `clipboard_preservation_unavailable`，直到获得可确认的格式通知。服务不会自动改写剪贴板来探测初始内容。
-
-普通应用默认粘贴键为 Windows/Linux 的 Ctrl+V。终端等不同目标可明确提供 `"paste_keys":["Ctrl","Shift","V"]`。剪贴板授权和键盘授权都需要可用；目标控件可能不接受粘贴。工具和普通日志不会返回原剪贴板内容，也不会记录图像、输入文本或 Portal 恢复令牌。
+以下启动参数仅在 Windows 提供，值必须为正：
 
 | 配置参数 | 默认值 |
 | --- | --- |
@@ -405,49 +384,25 @@ Wayland 的绝对坐标还要求可用的逻辑布局监视器：GNOME 使用 Mu
 | `--gui-max-pixels` | 16777216 个原始显示器像素 |
 | `--gui-max-png-bytes` | 16777216（16 MiB） |
 
-以上必须为正值。GUI 终态默认保留 10 分钟、最多 256 条记录；每会话最多保留 64 份坐标元数据、5 分钟有效。文字上限 UTF-8 64 KiB，剪贴板快照上限 1 MiB。组合键最多 8 个，拖拽最长 10 秒。
+终态默认保留 10 分钟、最多 256 条记录；每会话最多保留 64 份坐标记录、5 分钟有效。文字上限 UTF-8 64 KiB，组合键最多 8 个，拖拽最长 10 秒。
 
-### 真实桌面验证
+### 真实 Windows 桌面验证
 
-普通无桌面 CI 只检查代码与构建，不能算 GUI 原生验收。先在目标桌面启动服务，再显式运行：
-
-```sh
-python3 scripts/gui-smoke.py --execute --url http://127.0.0.1:8080/mcp --no-token --desktop-label 'KDE Plasma Wayland' --output-dir /tmp/gui-capture-evidence
-```
-
-该命令只查询、打开会话及截图，不向未知前台窗口输入。脚本使用独立 JSON-RPC，检查工具发现、标准 PNG 图片块、全部 PNG 扫描行、坐标和采集元数据，并关闭会话。Token 模式使用 `REMOTE_MCP_TOKEN` 或 `--token-file`，HTTPS 可用 `--ca-file`。不带 `--execute` 只显示帮助，不访问 GUI。
-
-完整基本操作可用可选验证依赖 **PySide6** 的专用窗口：
+普通无桌面 CI 只能验证代码和构建。目标 Windows 桌面启动服务后，可从 Linux 或 Windows 的 Python 宿主运行：
 
 ```sh
-python3 scripts/gui-smoke.py --execute --fixture --url http://127.0.0.1:8080/mcp --no-token --desktop-label 'KDE Plasma Wayland' --output-dir /tmp/gui-input-evidence
+python3 scripts/gui-smoke.py --execute \
+  --url http://WINDOWS_HOST:8080/mcp --no-token \
+  --desktop-label 'Windows' --output-dir .tmp/gui-capture-evidence
 ```
 
-脚本从真实截图的四个颜色标记定位窗口，验证点击、双击、拖拽、滚动、全选组合键和中文实际出现在控件；Wayland 强制使用原生 Qt Wayland 窗口。窗口必须完整可见且位于所选显示器，必要时使用 `--display-id`。用户自行确认系统授权，脚本不自动点击授权对话框。完整验证的可见中文字段接收全选快捷键后直接选中内容，避免 Qt 普通快捷键路径自动发布 PRIMARY；不会为验证而读取或回写 PRIMARY。剪贴板保留策略默认保持；只有明确接受替换时才增加 `--allow-clipboard-replace`。
+该命令使用独立 JSON-RPC 检查工具发现、后端、PNG 图片块、扫描行和采集元数据，然后关闭会话；默认只查询和截图。Token 模式使用 `REMOTE_MCP_TOKEN` 或 `--token-file`，HTTPS 可用 `--ca-file`。不带 `--execute` 只显示帮助，不连接服务。输出目录须事先不存在。
 
-仅验证键鼠时，可使用 `--fixture --fixture-inputs-only`：
-
-```sh
-python3 scripts/gui-smoke.py --execute --fixture --fixture-inputs-only --no-token --authorize-wait-seconds 605 --output-dir /tmp/gui-inputs-only-evidence
-```
-
-这个入口只向专用窗口执行点击、双击、拖拽、滚动、全选和 Backspace，核对固定字段实际清空，不调用 `gui_text`，不读取、重新发布或恢复剪贴板，也不能与刷新或允许替换并用。字段使用密码回显，阻止 Qt 普通全选自动复制到 PRIMARY 选区；报告只声明测试自身未调用剪贴板读写或选区复制，不保证外部合成器、剪贴板管理器或其他应用不会独立改变内容。中文输入及默认剪贴板恢复仍列为待验收。会话 ready 后先等待专用窗口获得焦点，上限使用授权等待参数；每次操作前的焦点确认仍只等待 10 秒。
-
-默认专用窗口验证会只读采样原剪贴板，在文本输入前后及 `gui_close` 后重新核对各 MIME 的长度和 SHA-256，不保存原内容。格式超过 64 种、累计内容超过 1 MiB、读取超时或哈希发生变化时，验证失败。Qt 会先物化单个格式，采样上限约束摘要处理与保留，不能作为 Qt 底层读取量的保证。显式替换模式不计为原内容恢复验收。
-
-在上述初始格式盲区环境，专用窗口测试可显式增加 `--refresh-clipboard-offer`。会话 ready 后，窗口聚焦读取全部 MIME（最多 64 种、累计 1 MiB），两次稳定读取均须与原基线哈希一致；仅在内存重新发布全部原格式及相同字节，并核对发布后摘要。Qt 可能自动新增 `text/plain;charset=utf-8`：只在原基线没有此格式，且它的长度和 SHA-256 与原 `text/plain` 完全相同时接受这个派生别名；任何其他新增、原格式移除或字节变化均失败。报告明确记录原格式摘要一致及新增别名，发布后的完整格式集作为输入恢复基线，同时独立保留原基线，在输入前后和关闭后核对全部原格式。该参数不能与 `--allow-clipboard-replace` 并用，不代表服务能够默认读取初始剪贴板。提供者由 Qt 管理，新的所有者或窗口退出时释放；发布前检查不能提供桌面协议未实现的原子所有权比较，发现变化即中止验收，不覆盖新内容。
-
-若原快照包含 `application/x-kde-onlyReplaceEmpty`，默认文字输入、同内容刷新及自动救援均在发布前拒绝。它是 KDE 所有权控制标记，原样复制到非空剪贴板可能被取消，不能当作普通 MIME 数据，也不会被测试自动剥除。用户主动点击恢复按钮时，若备份含此标记，会额外询问是否仅恢复有效数据并省略该控制标记；确认后仍核对有效数据摘要，但明确记录原格式集合未完全恢复，不能作为完整保存恢复验收。
-
-显式刷新还会将全部原格式字节保留在专用窗口的有界内存中，失去剪贴板所有权不清除备份，原内容不写盘或日志。失败后仅在会话已确认关闭、当前内容为空或与本次测试文字一致、读取版本稳定且 Qt 能确认本进程仍拥有提供者时自动救援；内容相等或 KDE 标记本身不能证明没有第三方所有者。无法确认时报告 `clipboard_recovery`、`fixture_retained` 和窗口 PID，保留窗口及备份，请用户点击“Restore original clipboard”（恢复原剪贴板）明确恢复后再关闭；关闭时会提醒备份尚未恢复。救援不改变本次验收失败结果。
-
-若人工授权需要更长时间，验证脚本可指定 `--authorize-wait-seconds 605`（默认 125 秒，允许 1～605 秒），并将测试服务配置为 `--gui-authorize-timeout 10m`。这只延长会话授权及 ready 后首次窗口聚焦的有界等待，不自动批准或重复发起授权。
-
-也可用 `--input-plan /路径/plan.json` 控制调用方准备的专用应用。计划包含目标说明、输入工具及参数；脚本补入会话 ID 和首张截图 ID，坐标相对首张整显示器截图。例如：
+可用 `--input-plan .tmp/plan.json` 操作调用方已准备并置于所选显示器的专用应用。计划含 `target` 和 `operations`，工具仅限 `gui_mouse/gui_key/gui_text`；脚本补入会话 ID 和首张截图 ID。例如：
 
 ```json
 {
-  "target":"已准备并置于所选显示器的测试编辑器",
+  "target":"已准备并获得焦点的专用测试编辑器",
   "operations":[
     {"tool":"gui_mouse","arguments":{"action":"click","x":320,"y":200}},
     {"tool":"gui_text","arguments":{"text":"中文测试"}}
@@ -455,6 +410,17 @@ python3 scripts/gui-smoke.py --execute --fixture --fixture-inputs-only --no-toke
 }
 ```
 
-自定义计划默认只核验事件返回，需人工确认图像及文字。若计划包含保存操作，可增加 `"verify_text_file":{"path":"脚本可读且事前不存在的产物路径","expected":"中文测试"}` 核对应用实际保存的 UTF-8 文件。脚本与目标运行在不同机器时，产物需另行传输到可读路径，脚本不把远端路径视为本地文件。
+计划默认只核验事件返回，应用结果需另行确认。若计划保存文件，可增加 `verify_text_file` 的 `path/expected`，核对事前不存在、脚本可读的 UTF-8 产物；远端文件需另行传输，远端路径不会作为本地文件读取。
 
-截图与元数据写入指定的新目录，专用窗口证据写入 `fixture.json`，最终 `report.json` 分列已核验与待验收项。报告始终保留 `acceptance_complete: false`，因为单次基本闭环不代替五类桌面、客户端展示、多屏混合缩放、剪贴板竞争和撤权断线的全部验收。交叉编译、模拟 HTTP 测试与真实桌面结果分别记录。
+Windows 没有 Python 时，可从本机通过已授权的匿名 MCP 入口部署 Go 专用原生窗口助手：
+
+```sh
+python3 scripts/windows-gui-smoke.py --execute \
+  --url http://WINDOWS_HOST:8080/mcp \
+  --bin-dir dist/windows-amd64 \
+  --report-file .tmp/windows-gui-evidence.json
+```
+
+脚本核对本机产物、远端文件和实际启动程序的 SHA-256。本机缓存和打包文件放项目 `.tmp/`，远端部署放 MCP 服务工作目录的 `.tmp/`；需该目录可写。用临时回环服务完成 Token/匿名两轮；仅向自己创建且确认前台和输入焦点的 Win32 窗口操作。它验证裁剪 PNG 的四色标记、真实鼠标和滚轮事件、全选清空、中文/emoji 实际进入 EDIT 控件。原生 Unicode 路线不访问剪贴板；窗口、会话、临时服务和部署目录清理后复查原 MCP 服务，再发布报告。旧功能/P0 原生入口继续默认四轮。
+
+2026-10-07 当前构建已在 Windows/amd64 单屏 100% DPI 环境完成上述 Token/匿名原生闭环；该结果不覆盖 Windows/arm64 原生运行、多屏/混合 DPI、布局变化、撤权或实际 MCP 客户端图片展示。报告保留 `acceptance_complete: false`，构建、模拟协议及真实桌面结果分别记录。历史 Linux GUI 研究仅供追溯，不属于当前支持范围或待交付项。

@@ -62,7 +62,7 @@ func TestGUIIndependentHTTP(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Cleanup(func() { app.Close() })
-			if err := app.gui.Close(); err != nil {
+			if err := closeGUI(app.gui); err != nil {
 				t.Fatal(err)
 			}
 			desktop := &protocolGUIDesktop{}
@@ -84,7 +84,12 @@ func TestGUIIndependentHTTP(t *testing.T) {
 			_, listed := rpcWithToken(t, client, ts.URL+"/mcp", session, `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`, token)
 			names := map[string]bool{}
 			for _, item := range listed["result"].(map[string]any)["tools"].([]any) {
-				names[item.(map[string]any)["name"].(string)] = true
+				tool := item.(map[string]any)
+				name := tool["name"].(string)
+				names[name] = true
+				if name == "gui_text" && (!strings.Contains(tool["description"].(string), "native Unicode") || !strings.Contains(tool["description"].(string), "clipboard mode is unsupported")) {
+					t.Fatal("独立协议发现中的文本说明不符合 Windows 契约")
+				}
 			}
 			for _, name := range []string{"gui_status", "gui_open", "gui_close", "gui_screenshot", "gui_mouse", "gui_key", "gui_text", "file_stat", "process_start", "terminal_open", "port_forward_create"} {
 				if !names[name] {
@@ -172,15 +177,89 @@ func TestGUIIndependentHTTP(t *testing.T) {
 	}
 }
 
-func TestGUIUnavailableDoesNotBlockServer(t *testing.T) {
-	t.Setenv("DISPLAY", "")
-	t.Setenv("WAYLAND_DISPLAY", "")
-	t.Setenv("XDG_SESSION_TYPE", "")
+func TestServerCreationDoesNotRequireDesktop(t *testing.T) {
 	app, err := New(config.Default(), io.Discard)
 	if err != nil {
 		t.Fatal("无桌面不应阻止服务创建", err)
 	}
 	if err := app.Close(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestPlatformGUIDiscovery(t *testing.T) {
+	for _, token := range []string{"", testToken} {
+		t.Run(map[bool]string{true: "token", false: "anonymous"}[token != ""], func(t *testing.T) {
+			c := config.Default()
+			c.Token = token
+			if !gui.Supported {
+				// 无 GUI 的产品启动不能被未使用的 GUI 配置或桌面环境阻止。
+				c.GUI = gui.Config{}
+				t.Setenv("DISPLAY", "unreachable-test-display")
+				t.Setenv("WAYLAND_DISPLAY", "unreachable-test-wayland")
+				t.Setenv("DBUS_SESSION_BUS_ADDRESS", "invalid-test-bus")
+			}
+			var logs bytes.Buffer
+			app, err := New(c, &logs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer app.Close()
+			if (app.gui != nil) != gui.Supported {
+				t.Fatal("服务创建了错误平台的 GUI 管理器")
+			}
+			ts := httptest.NewServer(app.Handler)
+			defer ts.Close()
+			client := ts.Client()
+			client.Timeout = 5 * time.Second
+			response, _ := rpcWithToken(t, client, ts.URL+"/mcp", "", initialize, token)
+			session := response.Header.Get("Mcp-Session-Id")
+			rpcWithToken(t, client, ts.URL+"/mcp", session, `{"jsonrpc":"2.0","method":"notifications/initialized"}`, token)
+			_, envelope := rpcWithToken(t, client, ts.URL+"/mcp", session, `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`, token)
+			tools := envelope["result"].(map[string]any)["tools"].([]any)
+			wantCount := 33
+			if gui.Supported {
+				wantCount += 7
+			}
+			if len(tools) != wantCount {
+				t.Fatalf("产品工具数不符：got=%d want=%d", len(tools), wantCount)
+			}
+			names := map[string]bool{}
+			for _, item := range tools {
+				tool := item.(map[string]any)
+				name := tool["name"].(string)
+				names[name] = true
+				if !gui.Supported && strings.HasPrefix(name, "gui_") {
+					t.Fatal("非 Windows 工具发现包含 GUI", name)
+				}
+				if name == "gui_text" && (!strings.Contains(tool["description"].(string), "native Unicode") || !strings.Contains(tool["description"].(string), "clipboard mode is unsupported")) {
+					t.Fatal("Windows 文本工具说明必须匹配直接输入与不支持剪贴板的契约")
+				}
+				if name == "gui_open" && strings.Contains(tool["description"].(string), "Wayland") {
+					t.Fatal("Windows 工具说明残留 Linux 授权语义")
+				}
+			}
+			for _, name := range []string{"gui_status", "gui_open", "gui_close", "gui_screenshot", "gui_mouse", "gui_key", "gui_text"} {
+				if names[name] != gui.Supported {
+					t.Fatal("GUI 工具发现与平台条件不符", name)
+				}
+				if !gui.Supported {
+					request, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": map[string]any{"name": name, "arguments": map[string]any{}}})
+					_, call := rpcWithToken(t, client, ts.URL+"/mcp", session, string(request), token)
+					if call["error"] == nil {
+						t.Fatal("移除的 GUI 工具必须走 SDK 未注册协议错误", name, call)
+					}
+				}
+			}
+			if !gui.Supported && (!strings.Contains(logs.String(), "error_code=unknown_tool") || !strings.Contains(logs.String(), "Requested tool is not registered")) {
+				t.Fatal("缺少移除 GUI 的明确受控日志诊断")
+			}
+			if err := app.Close(); err != nil {
+				t.Fatal("无 GUI 管理器关闭失败", err)
+			}
+			if err := app.Close(); err != nil {
+				t.Fatal("重复关闭失败", err)
+			}
+		})
 	}
 }

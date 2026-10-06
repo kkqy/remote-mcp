@@ -64,11 +64,13 @@ func Parse(args []string, stderr io.Writer) (Config, error) {
 	fs.DurationVar(&c.Forwarding.DialTimeout, "forward-dial-timeout", c.Forwarding.DialTimeout, "TCP forwarding target connection timeout")
 	fs.DurationVar(&c.Forwarding.Retention, "forward-retention", c.Forwarding.Retention, "Completed TCP forwarding record retention")
 	fs.DurationVar(&c.Forwarding.SweepInterval, "forward-sweep-interval", c.Forwarding.SweepInterval, "TCP forwarding record cleanup interval")
-	fs.DurationVar(&c.GUI.IdleTimeout, "gui-idle", c.GUI.IdleTimeout, "GUI session timeout without calls")
-	fs.DurationVar(&c.GUI.AuthorizationTimeout, "gui-authorize-timeout", c.GUI.AuthorizationTimeout, "Total GUI authorization timeout")
-	fs.DurationVar(&c.GUI.OperationTimeout, "gui-operation-timeout", c.GUI.OperationTimeout, "Screenshot and input operation timeout")
-	fs.IntVar(&c.GUI.MaxPixels, "gui-max-pixels", c.GUI.MaxPixels, "Maximum pixels in a raw display screenshot")
-	fs.IntVar(&c.GUI.MaxPNGBytes, "gui-max-png-bytes", c.GUI.MaxPNGBytes, "Maximum PNG screenshot size in bytes")
+	if gui.Supported {
+		fs.DurationVar(&c.GUI.IdleTimeout, "gui-idle", c.GUI.IdleTimeout, "GUI session timeout without calls")
+		fs.DurationVar(&c.GUI.AuthorizationTimeout, "gui-authorize-timeout", c.GUI.AuthorizationTimeout, "Total GUI authorization timeout")
+		fs.DurationVar(&c.GUI.OperationTimeout, "gui-operation-timeout", c.GUI.OperationTimeout, "Screenshot and input operation timeout")
+		fs.IntVar(&c.GUI.MaxPixels, "gui-max-pixels", c.GUI.MaxPixels, "Maximum pixels in a raw display screenshot")
+		fs.IntVar(&c.GUI.MaxPNGBytes, "gui-max-png-bytes", c.GUI.MaxPNGBytes, "Maximum PNG screenshot size in bytes")
+	}
 	fs.Usage = func() {
 		fmt.Fprintln(stderr, "Usage: remote-mcp [options]; startup prints an alternative MCP JSON configuration for each IP.")
 		fs.SetOutput(stderr)
@@ -133,5 +135,8 @@ func (c Config) Validate() error {
 	if err := c.Forwarding.Validate(); err != nil {
 		return err
 	}
-	return c.GUI.Validate()
+	if gui.Supported {
+		return c.GUI.Validate()
+	}
+	return nil
 }

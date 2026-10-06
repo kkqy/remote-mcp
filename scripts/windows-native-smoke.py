@@ -5,7 +5,7 @@ import base64
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import subprocess
 import sys
 import tempfile
@@ -77,6 +77,8 @@ def run_remote(protocol, command, arguments, directory=None, timeout=180):
             "background": True, "timeout_ms": 0}
     if directory:
         args["dir"] = directory
+        # 受管助手和包测试的子进程也必须在本次持有目录内创建临时文件。
+        args["env"] = {name: directory for name in ("TMPDIR", "TMP", "TEMP")}
     process = protocol.tool("process_start", args)
     streams = {"stdout": bytearray(), "stderr": bytearray()}
     cursors = {"stdout": 0, "stderr": 0}
@@ -112,7 +114,6 @@ def powershell(protocol, code, timeout=30):
     encoded = base64.b64encode(code.encode("utf-16le")).decode("ascii")
     exit_code, output = run_remote(protocol, "powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded], timeout=timeout)
     if exit_code != 0:
-        Path("/tmp/remote-mcp-native-powershell-failure.txt").write_text(output["stderr"], encoding="utf-8")
         raise RuntimeError("Remote PowerShell operation failed")
     return output["stdout"]
 
@@ -138,9 +139,28 @@ def upload(protocol, source, destination):
             protocol.tool("upload_cancel", {"id": created["id"]})
 
 
+def workspace_temp(repository):
+    """本机临时资源只使用仓库 .tmp，不沿用系统临时目录或逃逸链接。"""
+    root = repository.resolve()
+    temporary = root / ".tmp"
+    if not temporary.resolve().is_relative_to(root):
+        raise RuntimeError("Workspace temporary directory must remain inside the repository")
+    temporary.mkdir(mode=0o700, exist_ok=True)
+    return temporary
+
+
 def prepare_archive(repository, binaries, target, arch, packages):
     """仅打包本任务二进制及生产源码，不携带仓库配置、凭据或工作日志。"""
     environment = os.environ.copy()
+    temporary = workspace_temp(repository)
+    build_paths = {name: temporary / directory for name, directory in (
+        ("TMPDIR", "native-temp"), ("TMP", "native-temp"), ("TEMP", "native-temp"),
+        ("GOCACHE", "go-cache"), ("GOTMPDIR", "go-tmp"))}
+    for path in build_paths.values():
+        if not path.resolve().is_relative_to(repository.resolve()):
+            raise RuntimeError("Native build cache must remain inside the repository")
+        path.mkdir(mode=0o700, exist_ok=True)
+    environment.update({name: str(path) for name, path in build_paths.items()})
     environment.update(GOOS="windows", GOARCH=arch, CGO_ENABLED="0")
     helper = target.parent / "native-helper.exe"
     subprocess.run(["go", "build", "-trimpath", "-o", str(helper), "./scripts/native-smoke"],
@@ -185,43 +205,64 @@ def validate_smoke_summary(summary, arch):
     summary["protocol_smoke"] = True
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Validate Windows binaries through an explicitly authorized anonymous MCP endpoint.")
+def main(gui_validator=None, gui_diagnostic_validator=None):
+    gui_mode = gui_validator is not None
+    parser = argparse.ArgumentParser(description=("Validate Windows GUI input in a dedicated native window through an authorized MCP endpoint." if gui_mode else "Validate Windows binaries through an explicitly authorized anonymous MCP endpoint."))
     parser.add_argument("--url", required=True, help="Authorized existing Windows MCP endpoint; it is kept running")
     parser.add_argument("--bin-dir", default="dist/windows-amd64", type=Path)
     parser.add_argument("--report-file", type=Path, required=True)
     parser.add_argument("--skip-package-tests", action="store_true", help="Run only four native protocol smoke rounds")
     parser.add_argument("--package", action="append", choices=PACKAGES, help="Run selected native test packages; default runs all listed packages")
     parser.add_argument("--package-only", action="store_true", help="Run native package tests without starting smoke services")
+    if gui_mode:
+        parser.add_argument("--execute", action="store_true", help="Explicitly permit GUI validation in the dedicated remote window")
     args = parser.parse_args()
+    if gui_mode:
+        if not args.execute:
+            parser.print_help()
+            return
+        assert not (args.package or args.package_only or args.skip_package_tests), "GUI validation cannot select protocol package modes"
     assert not (args.skip_package_tests and (args.package or args.package_only)), "Conflicting package validation options"
-    selected_packages = () if args.skip_package_tests else tuple(args.package or PACKAGES)
+    selected_packages = () if gui_mode or args.skip_package_tests else tuple(args.package or PACKAGES)
     args.report_file.unlink(missing_ok=True)
     protocol = Protocol(args.url)
     tools = {tool["name"] for tool in protocol.rpc("tools/list", {})["tools"]}
     assert {"process_start", "process_read", "process_status", "process_stop", "upload_create", "upload_write", "upload_finish", "upload_cancel"} <= tools
-    discovery = json.loads(powershell(protocol, "[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false);"
+    discovery = json.loads(powershell(protocol, "if((Get-Location).Provider.Name -ne 'FileSystem'){throw 'A filesystem working directory is required'};"
+                                          "$work=[IO.Path]::GetFullPath((Get-Location).ProviderPath);"
                                           "[ordered]@{platform=[Environment]::OSVersion.Platform.ToString();"
                                           "arch=[Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString();"
-                                          "temp=[IO.Path]::GetTempPath()}|ConvertTo-Json -Compress"))
+                                          "work_directory=$work}|ConvertTo-Json -Compress"))
     assert discovery["platform"] == "Win32NT", "Remote platform is not Windows"
     arch = {"X64": "amd64", "Arm64": "arm64"}.get(discovery["arch"])
     assert arch and args.bin_dir.name == "windows-" + arch, "Remote architecture does not match the binary directory"
-    root = discovery["temp"].rstrip("\\/") + "\\remote-mcp-native-" + uuid.uuid4().hex
+    working = discovery.get("work_directory")
+    assert isinstance(working, str) and 0 < len(working) <= 32700 and "\x00" not in working and PureWindowsPath(working).is_absolute(), "Remote filesystem working directory is unconfirmed"
+    root = str(PureWindowsPath(working) / ".tmp" / ("remote-mcp-native-" + uuid.uuid4().hex))
     root_literal = quote_ps(root)
-    state_file = Path(tempfile.gettempdir()) / ("remote-mcp-native-state-" + uuid.uuid4().hex + ".json")
-    state_file.write_text(json.dumps({"root": root}), encoding="utf-8")
     repository = Path(__file__).resolve().parents[1]
+    temporary_root = workspace_temp(repository)
+    state_file = temporary_root / ("remote-mcp-native-state-" + uuid.uuid4().hex + ".json")
+    state_file.write_text(json.dumps({"root": root}), encoding="utf-8")
     tests = []
-    with tempfile.TemporaryDirectory(prefix="remote-mcp-native-deploy-") as directory:
+    with tempfile.TemporaryDirectory(prefix="remote-mcp-native-deploy-", dir=temporary_root) as directory:
         archive = Path(directory) / "native.zip"
         artifact_hashes = prepare_archive(repository, args.bin_dir.resolve(), archive, arch, selected_packages)
-        print(json.dumps({"stage": "prepared", "platform": "windows", "arch": arch, "archive_bytes": archive.stat().st_size}), flush=True)
-        powershell(protocol, "$ErrorActionPreference='Stop';[IO.Directory]::CreateDirectory(" + root_literal + ")|Out-Null")
+        prepared = {"stage": "prepared", "platform": "windows", "arch": arch, "archive_bytes": archive.stat().st_size}
+        if gui_mode:
+            prepared.update(artifact_hashes)
+        print(json.dumps(prepared), flush=True)
+        primary_error = None
         try:
+            powershell(protocol, "$ErrorActionPreference='Stop';[IO.Directory]::CreateDirectory(" + root_literal + ")|Out-Null")
             upload(protocol, archive, root + "\\native.zip")
             powershell(protocol, "$ErrorActionPreference='Stop';Expand-Archive -LiteralPath " + quote_ps(root + "\\native.zip") + " -DestinationPath " + root_literal, timeout=60)
-            print(json.dumps({"stage": "uploaded", "platform": "windows", "arch": arch}), flush=True)
+            uploaded = {"stage": "uploaded", "platform": "windows", "arch": arch}
+            if gui_mode:
+                hashes = json.loads(powershell(protocol, "$ErrorActionPreference='Stop';[ordered]@{server_sha256=(Get-FileHash -Algorithm SHA256 -LiteralPath " + quote_ps(root + "\\remote-mcp.exe") + ").Hash.ToLowerInvariant();helper_sha256=(Get-FileHash -Algorithm SHA256 -LiteralPath " + quote_ps(root + "\\native-helper.exe") + ").Hash.ToLowerInvariant()}|ConvertTo-Json -Compress"))
+                assert hashes == artifact_hashes, "Remote GUI executable hash verification failed"
+                uploaded.update(hashes, remote_artifacts_verified=True)
+            print(json.dumps(uploaded), flush=True)
             if selected_packages:
                 for package in selected_packages:
                     path = root + "\\" + package.replace("/", "\\")
@@ -232,34 +273,56 @@ def main():
                     if code != 0:
                         # 失败记录仅来自本任务测试夹具，不输出远程目录或原始错误内容。
                         failed = [line.split()[2].split("(")[0] for line in lines if line.startswith("--- FAIL:")]
-                        Path("/tmp/remote-mcp-windows-native-failed-test.txt").write_text(output["stdout"] + "\n" + output["stderr"], encoding="utf-8")
                         print(json.dumps({"stage": "package_failed", "package": package, "tests": failed}), flush=True)
                         raise RuntimeError("Windows native package tests failed")
                     print(json.dumps({"stage": "package_passed", **tests[-1]}), flush=True)
             if args.package_only:
                 summary = {"ok": True, "platform": "windows", "arch": arch, "protocol_smoke": False, "rounds": []}
             else:
-                code, output = run_remote(protocol, root + "\\native-helper.exe", [root], root)
+                helper_arguments = [root, "--gui", artifact_hashes["server_sha256"], artifact_hashes["helper_sha256"]] if gui_mode else [root]
+                code, output = run_remote(protocol, root + "\\native-helper.exe", helper_arguments, root)
                 if code != 0:
                     diagnostic = output["stderr"].strip()
                     assert len(diagnostic) <= 512 and root not in diagnostic, "Native diagnostic exceeded safe bounds"
+                    if gui_mode and output["stdout"]:
+                        assert len(output["stdout"].encode("utf-8")) <= 16384, "GUI diagnostic exceeded its limit"
+                        evidence = json.loads(output["stdout"])
+                        assert gui_diagnostic_validator is not None, "GUI diagnostic validator is missing"
+                        gui_diagnostic_validator(evidence)
+                        print(json.dumps({"stage": "gui_diagnostic", "evidence": evidence, **artifact_hashes}), flush=True)
                     print(json.dumps({"stage": "smoke_failed", "reason": diagnostic}), flush=True)
-                    raise RuntimeError("Windows native protocol smoke failed")
+                    raise RuntimeError("Windows native GUI smoke failed: " + diagnostic if gui_mode else "Windows native protocol smoke failed")
                 summary = json.loads(output["stdout"])
-                validate_smoke_summary(summary, arch)
+                if gui_mode:
+                    assert summary.get("artifacts") == artifact_hashes, "GUI helper artifact evidence did not match verified uploads"
+                (gui_validator if gui_mode else validate_smoke_summary)(summary, arch)
+        except BaseException as error:
+            primary_error = error
+            raise
         finally:
-            powershell(protocol, "$ErrorActionPreference='Stop';Remove-Item -LiteralPath " + root_literal +
-                       " -Recurse -Force;if(Test-Path -LiteralPath " + root_literal + "){throw 'Temporary cleanup failed'}", timeout=60)
-            state_file.unlink()
+            try:
+                if gui_mode:
+                    # 只重试本次精确目录的删除，等待 Windows 退出句柄释放；不扫描或杀其他进程。
+                    cleanup = "$ErrorActionPreference='Stop';$deadline=[DateTime]::UtcNow.AddSeconds(5);while(Test-Path -LiteralPath " + root_literal + "){if([DateTime]::UtcNow -ge $deadline){throw 'Temporary cleanup failed'};try{Remove-Item -LiteralPath " + root_literal + " -Recurse -Force}catch{if([DateTime]::UtcNow -ge $deadline){throw 'Temporary cleanup failed'};Start-Sleep -Milliseconds 100}}"
+                else:
+                    cleanup = "$ErrorActionPreference='Stop';Remove-Item -LiteralPath " + root_literal + " -Recurse -Force;if(Test-Path -LiteralPath " + root_literal + "){throw 'Temporary cleanup failed'}"
+                powershell(protocol, cleanup, timeout=60)
+                state_file.unlink()
+            except Exception as cleanup_error:
+                if gui_mode:
+                    print(json.dumps({"stage": "cleanup_failed", "cleanup_error": "Remote deployment cleanup failed", **artifact_hashes}), flush=True)
+                if primary_error is not None:
+                    raise RuntimeError("Validation failed and deployment cleanup failed") from primary_error
+                raise cleanup_error
     preserved = Protocol(args.url)
     assert {tool["name"] for tool in preserved.rpc("tools/list", {})["tools"]} == tools, "Existing MCP service is unavailable after cleanup"
     assert artifact_hashes and artifact_hashes["server_sha256"], "Missing uploaded artifact hashes"
     summary.update(package_tests=tests, deployment_cleaned=True,
                    **artifact_hashes,
                    existing_service_preserved=True, python_smoke_executed=False,
-                   gui_exercised=False)
+                   gui_exercised=gui_mode)
     args.report_file.parent.mkdir(parents=True, exist_ok=True)
-    temporary = args.report_file.with_name(".native-report-" + uuid.uuid4().hex)
+    temporary = temporary_root / (".native-report-" + uuid.uuid4().hex)
     try:
         temporary.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         temporary.replace(args.report_file)

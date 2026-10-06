@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"remote-mcp/internal/config"
+	"remote-mcp/internal/gui"
 )
 
 type p0Logs struct {
@@ -119,7 +120,11 @@ func TestP0IndependentDiscoveryAndFiles(t *testing.T) {
 	p := newP0Protocol(t)
 	listed := p.request("tools/list", map[string]any{})
 	tools := listed["tools"].([]any)
-	if len(tools) != 40 {
+	wantCount := 33
+	if gui.Supported {
+		wantCount += 7
+	}
+	if len(tools) != wantCount {
 		t.Fatalf("工具数量: %d", len(tools))
 	}
 	names := map[string]map[string]any{}

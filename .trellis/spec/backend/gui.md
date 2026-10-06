@@ -1,81 +1,100 @@
-# GUI 截图与输入契约
+# Windows GUI 截图与输入契约
 
 ## 1. 范围与触发条件
 
-修改 GUI 后端、配置、工具或原生验证脚本时阅读本规范。GUI 控制当前用户桌面，复用 `/mcp`、鉴权及 Origin 校验；没有独立控制网页。缺桌面、权限或采集依赖只影响 GUI，不能阻断旧工具启动。
+修改 GUI 后端、配置、工具或原生验证脚本时阅读本规范。用户于 2026-10-07 取消 Linux 全部 GUI；仅 Windows 提供图形操作。Linux 保留命令行远程调试工具，不创建图形管理器、不探测桌面、不注册 `gui_*`、不显示或接受 `gui-*` 参数。macOS 不在支持范围。
 
-## 2. 签名
+Windows GUI 控制服务运行账号的当前交互桌面，复用 `/mcp`、鉴权及 Origin 校验；没有独立控制网页。缺少桌面或权限只影响 GUI，不能阻断文件、进程、终端和转发。
+
+## 2. 签名与平台边界
 
 - 管理器提供 `DefaultConfig()`、`New(Config)`、`Register(*mcp.Server)`、`Close() error`。
-- `Backend.Probe(context.Context) (Status, error)` 不发起授权；`Open(context.Context) (Desktop, error)` 建立独立于创建请求的会话。
+- `Backend.Probe(context.Context) (Status, error)` 只读查询；`Open(context.Context) (Desktop, error)` 建立独立于创建请求的会话。
 - `Desktop` 提供 `Capabilities/Displays/Capture/Mouse/Key/Text/Close`，可选 `Done/Err` 健康接口。`Close` 可与取消中的操作并发。
-- 工具为 `gui_status/open/close/screenshot/mouse/key/text`，完整类型与 JSON 标签见 `internal/gui/types.go`。HTTP 层不能复制状态机。
+- Windows 工具为 `gui_status/open/close/screenshot/mouse/key/text`，类型与 JSON 标签见 `internal/gui/types.go`。HTTP 层不能复制状态机。
+- 配置和服务接入共用平台支持条件；非 Windows 构建桩只用于共享包可编译，不能注册到产品。Linux 模拟 HTTP 测试可显式注入假后端；产品默认必须无 GUI 管理器，关闭须支持该状态。
 
 ## 3. 请求、响应和配置契约
 
-- `gui_open(request_id, wait_ms)` 等待 0～10000 毫秒；返回 ID、状态、实际能力与显示器，`authorizing` 后查 `gui_status(id)`。请求 ID 去重，活跃记录不淘汰。
+- `gui_open(request_id, wait_ms)` 等待 0～10000 毫秒；返回 ID、状态、实际能力与显示器；请求 ID 去重，活跃记录不淘汰。
 - `gui_screenshot(id, display_id?, region?)` 输出不缩放的 PNG。原始字节交给 SDK `mcp.ImageContent`，结构化内容仅含元数据，不重复图片。
-- 元数据含 `capture_id/display_id/width/height/region/logical_bounds/layout_generation/captured_at/captured_at_source/frame_sequence/freshness`。序号是成功截图计数；Wayland `latest_available/received_at` 仅表示 PNG 首字节接收观察时间，不是源渲染时间。
-- `gui_mouse(id, capture_id, action, x, y, ...)` 坐标相对输出图片，叠加裁剪偏移后按实际像素与逻辑尺寸换算。Wayland 向授权流提交局部坐标，原生后端按需加全局偏移。布局变化或记录过期使旧截图失效，不猜 1:1 比例。
-- Wayland 必须监视逻辑布局，不能只比较帧像素。GNOME 用 DisplayConfig，KDE 按当前 KScreen D-Bus 可用性探测，订阅后读取基线；配置变化、服务替换或监视断线使映射失效。没有可靠监视器则禁用绝对输入并说明原因；只读初始化不允许调用显示配置写入接口。
+- 元数据含 `capture_id/display_id/width/height/region/logical_bounds/layout_generation/captured_at/captured_at_source/frame_sequence/freshness`；序号是成功截图计数，Windows 原生采集时间来源为 `acquired_at`。
+- `gui_mouse(id, capture_id, action, x, y, ...)` 坐标相对输出图片，叠加裁剪偏移后按实际像素与逻辑尺寸换算，再加显示器全局偏移。布局变化或记录过期使旧截图失效，不猜 1:1 比例。
 - `gui_key(id, keys)` 一次提交完整组合键，最多 8 个，释放本次按键。拖拽最多 10000 毫秒，不提供跨调用长按。
-- `gui_text(id, text, mode?, paste_keys?, allow_clipboard_replace?)` 支持 UTF-8；默认 `auto` 优先原生 Unicode，再剪贴板。显式 `direct/clipboard` 不静默换模式。默认粘贴键 Windows/Linux 为 Ctrl+V。`submitted` 只代表提交事件，应用结果另验。
-- 剪贴板默认保存所有支持格式后替换、恢复；无法保存则拒绝。只有 `allow_clipboard_replace=true` 允许省略保存。第三方新所有者出现时不覆盖，报告 `skipped_new_owner`。恢复所需惰性提供者保留有界旧快照直到接管或关闭；关闭后可读性单独验证。
-- KDE Portal 的 RequestClipboard 实现只订阅后续 offerChanged，没有初始格式读取接口。未收到可靠格式/所有权通知时必须拒绝默认粘贴，不猜测 text/plain 就宣称完整保存。缺失或非法的 MIME 字段不能被当成已知空剪贴板。测试可显式让专用窗口发布经完整读取和哈希确认的同内容 offer，不能混同为服务默认解决初始盲区。
-- KDE `application/x-kde-onlyReplaceEmpty` 是所有权控制格式，非空 selection 上原样恢复会被合成器拒绝；默认保存必须拒绝，测试准备及救援也不能删除标记后宣称完整恢复。SetSelection 期间的中间非 owner 通知不能提前丢弃 provider 数据；有界等待确认自身 owner 和目标格式集合完全一致，失败后才按实际所有权处理数据。
-- 恢复失败保留有界原快照并拒绝后续文本替换。关闭先取消文本操作、等待独立恢复，保持信号和 FD 传输可用；只有仍能确认自身所有权才重试，不能覆盖外部新所有者。错误原因使用固定枚举，不能拼接 D-Bus Body。
-- SetSelection 已提交但 owner 确认超时属于未知状态，中间非 owner 不能直接证明第三方接管；须保留有界恢复来源，不能误报 `skipped_new_owner`。关闭等待传输 goroutine 全部退出后清除原始 provider 和 recovery 数据，终态记录不能继续持有剪贴板字节。
+- `gui_text(id, text, mode?, paste_keys?, allow_clipboard_replace?)` 支持 UTF-8；Windows `auto/direct` 使用原生 Unicode，不访问 Clipboard。显式 `clipboard` 返回 `unsupported`，不静默换模式；兼容参数保留不代表支持剪贴板粘贴。`submitted` 只代表提交事件，应用结果另验。
 - 最多一个待授权或就绪会话。操作串行，真实忙时返回 `busy`，不建无界队列。取消等待不提前释放占用；底层完成、释放按键和占用后发布结果。
-- 默认：空闲 30 分钟，终态保留 10 分钟/256 条；授权 2 分钟，操作 30 秒；原图 16777216 像素/PNG 16 MiB；坐标记录 64 条/5 分钟；文本 64 KiB，剪贴板 1 MiB。分配或替换前限额，像素乘法用除法避免溢出。
-- CLI 为 `--gui-idle/--gui-authorize-timeout/--gui-operation-timeout/--gui-max-pixels/--gui-max-png-bytes`。Linux/Windows 四组合保持 `CGO_ENABLED=0`；Wayland 运行需用户 D-Bus、匹配 Portal、PipeWire、GStreamer 及采集插件。
-- 普通日志不输出文字、图片、剪贴板、Portal 令牌或辅助进程完整 stderr。Go 输出限额不等于第三方媒体进程的总 RSS 上限。
+- 默认：空闲 30 分钟，终态保留 10 分钟/256 条；授权 2 分钟，操作 30 秒；原图 16777216 像素/PNG 16 MiB；坐标记录 64 条/5 分钟；文本 64 KiB。分配前校验限额，像素乘法用除法避免溢出。
+- Windows CLI 为 `--gui-idle/--gui-authorize-timeout/--gui-operation-timeout/--gui-max-pixels/--gui-max-png-bytes`；全部须为正值。Linux 不校验未使用的 GUI 配置。Linux/Windows 四组合保持 `CGO_ENABLED=0`。
+- 普通日志不输出文字、图片、剪贴板或凭据。业务错误向 Agent 返回具体英文原因、稳定错误码和必要的 `input_may_have_applied`；错误日志遵循已有安全过滤契约。
 
 ## 4. 校验与错误矩阵
 
 | 条件 | 结果 |
 | --- | --- |
-| 无桌面、缺依赖、权限不足 | `no_gui/dependency_missing/permission_denied`，旧工具仍可用 |
-| 拒绝或授权超时 | `authorization_cancelled/authorization_timeout`，清理 Request 和会话 |
+| Linux 调用 GUI 工具 | 协议未知工具；不进入 GUI 处理器 |
+| Linux 使用 GUI CLI 参数 | 英文参数错误 |
+| Windows 无桌面或权限不足 | `no_gui/permission_denied`，旧工具仍可用 |
 | 坐标 NaN/Inf、区域越界、未知或重复键 | `invalid_argument`，不输入 |
 | 无有效截图或布局改变 | `stale_capture`，不猜映射 |
 | 像素、PNG、文本超限 | `limit_exceeded`，不绕过限额 |
-| 缺可靠映射或指定能力 | `unsupported`，说明实际原因 |
+| 指定能力或文本模式不可用 | `unsupported`，说明实际原因 |
 | 操作仍运行 | `busy`，不排无界队列 |
-| 无可靠剪贴板保存且未允许替换 | `clipboard_preservation_unavailable`，不修改剪贴板 |
-| 部分输入或恢复失败 | `input_failed/clipboard_restore_failed` 与 `input_may_have_applied`，不可盲目重试 |
-| 会话撤销或连接关闭 | `session_closed`，结束等待并释放资源 |
-| Portal 可选字段缺失或非法 | 业务失败或不可用映射，不对 nil Variant 执行反射转换，不 panic |
+| 部分输入失败或取消 | 明确英文原因与 `input_may_have_applied`，不可盲目重试 |
+| 会话关闭 | `session_closed`，结束等待并释放资源 |
 
 ## 5. 正常、边界与失败案例
 
-- 正常：打开 → 截图 → 以截图坐标聚焦 → 输入中文 → 再截图核对 → 关闭。
-- 边界：200% 缩放的裁剪图，先叠加偏移再换算逻辑单位，允许其他屏幕负全局坐标。
-- 边界：静止 Wayland 无持续新帧，等待有界且准确标注最新可用帧。
-- 失败：输入取消时可能已生效，仍持有占用直到释放按键；不自动重试。
-- 失败：原剪贴板含不能恢复的文件传输 MIME、超限或读取超时，默认不替换。
+正常：打开 → 截图 → 以截图坐标聚焦 → 输入中文 → 再截图核对 → 关闭。边界：裁剪、高 DPI、其他屏幕负全局坐标须使用实际映射。失败：输入取消时可能已生效，仍持有占用直到释放按键；不自动重试。系统 UIPI 可能拒绝向更高权限应用输入，不控制安全桌面或服务会话。
 
 ## 6. 必需测试与断言
 
-- 管理器：连续成功、并发忙、取消占用、授权和关闭、坐标淘汰、裁剪缩放、多屏布局失效、NaN/Inf 与溢出。
-- Linux：Portal 可选字段、失败/拒绝、响应先于方法返回、FD 读写限额、辅助进程超时/回收、剪贴板竞争与恢复失败。模拟总线不替代原生验收。
-- 剪贴板恢复：覆盖控制格式拒绝、恢复中的非 owner→owner 通知、格式集合不匹配、取消后的原快照保留与关闭重试。显式刷新测试保留有界原始备份；失败不得无提示销毁唯一恢复来源，内容相等不能代替所有权证据。
-- Wayland 布局：覆盖像素不变但逻辑尺寸变化、授权期间变化、监视器失败/断线和服务 owner 替换；断言旧截图拒绝、映射禁用，绝不能仅订阅未存在的接口就宣称监视成功。
-- 独立 HTTP：七 GUI 与旧工具共存；PNG 只有一份正确 Base64，元数据与像素一致；匿名、Token 和 Origin 保持。
-- `scripts/gui-smoke.py --execute --fixture` 只操作专用窗口，核对实际中文、组合键、点击、双击、拖拽、滚动；Wayland 窗口必须原生。剪贴板用只读哈希比较输入前、恢复后和关闭后的内容，不输出原文。
-- `--fixture-inputs-only` 只与专用窗口并用，不能与刷新或允许替换并用。首次焦点等待使用有界授权期限；后续每次操作仍短期限守卫。Qt 普通 QLineEdit 全选可能复制到 PRIMARY，因此该子集使用 Password 回显模式阻止自动复制，再核验组合键清空实际字段；不调用 gui_text 或剪贴板采样，中文恢复必须保留待验收。
-- 完整专用窗口也必须阻止 SelectAll 的自动 PRIMARY 复制：窗口处理真实 SelectAll 快捷键并直接选择字段，其余 Qt 输入路径保持；不能让验证准备改写 PRIMARY 后再把 Klipper 同步当成服务恢复结果。Qt offscreen 回归只证明隔离环境的控件行为，不能代替宿主剪贴板验收。
-- 跑全包 test/vet、本机 race、Linux/Windows 四组合构建和旧二进制冒烟。Windows/X11/GNOME/KDE、客户端图片展示及混合缩放分别记账；构建不是原生成功。2026-10-06 用户取消 macOS 支持，Darwin 后端及相关测试不再保留。
+- 管理器：连续成功、并发忙、取消占用、打开和关闭、坐标淘汰、裁剪缩放、多屏布局失效、NaN/Inf 与溢出。
+- Linux 默认独立 HTTP 工具发现无七 GUI，移除工具调用被拒绝；CLI 帮助及参数拒绝覆盖；无 GUI 管理器时完整关闭和旧工具正常。
+- 显式假后端 HTTP：七 GUI、PNG 只有一份正确 Base64、元数据与像素一致、英文错误、匿名/Token/Origin 保持。假后端不代表 Linux 产品支持 GUI。
+- `scripts/gui-smoke.py --execute` 可从任意 Python 宿主验证远端 Windows HTTP/PNG；按服务后端判断，不能按宿主系统误拒远端 Windows。默认只读截图；`--input-plan` 仅控制调用方已准备的专用目标，返回事件提交不能代替应用实际结果。
+- 删除 Linux X11/Wayland/Portal/KScreen 后端、专属测试、Qt 夹具及专用依赖；不能把旧研究继续注入当前实现契约。
+- 跑全包 test/vet、本机 race、Linux/Windows 四组合构建和旧功能/P0 Token/匿名实际冒烟。Windows 原生验收、构建及未验证边界分别记账。历史 Linux GUI 研究保留供追溯，不计为当前要求。
 
 ## 7. 错误方式与正确方式
 
-错误：调用取消就释放 busy，使新旧输入交错；或 worker 先 cancel 自己，再检查 context，把成功误报取消。
+错误：调用取消就释放 busy，使新旧输入交错；或仅在处理器内拒绝 Linux GUI，却仍公开工具和 CLI。
 
-正确：底层结束并释放按键 → 解除占用 → 发布结果；调用方取消只结束等待。
-
-错误：缺少字段时对 nil Variant 调用 `dbus.Store`，或猜测媒体像素等于逻辑坐标。
-
-正确：先检查字段与类型，使用已查证逻辑尺寸；无法可靠映射时保留截图、禁用绝对输入。
+正确：底层结束并释放按键 → 解除占用 → 发布结果；调用方取消只结束等待。平台边界在配置和服务注册处生效。
 
 错误：有界输出类型嵌入 `bytes.Buffer`，只覆盖 `Write`，认为 `io.Copy` 一定经过上限校验。
 
-正确：缓冲区作为私有字段，避免提升 `ReadFrom` 方法绕过 `Write`；用真实复制路径断言超限失败。X11 连接与握手必须使用可取消传输，取消及关闭能打断等待协议回复，不只放弃等待 goroutine。
+正确：缓冲区作为私有字段，避免提升 `ReadFrom` 方法绕过 `Write`；用真实复制路径断言超限失败。
+
+## Windows 专用原生窗口验收
+
+### 1. 范围与触发
+远端 Windows 没有 Python、已有用户授权的匿名 MCP 入口时，本机薄部署脚本上传标准库 Go 原生助手；只操作本轮创建的窗口。默认旧功能/P0 四轮不得因此访问 GUI。
+
+### 2. 命令签名
+`python3 scripts/windows-gui-smoke.py --execute --url <已授权MCP入口> --bin-dir dist/windows-amd64 --report-file <本机报告>`。底层助手为 `native-helper.exe <唯一部署目录> --gui <server_sha256> <helper_sha256>`；不带 `--execute` 只显示帮助，不连接远端。不能混用包测试选择参数。
+
+### 3. 输入与输出契约
+复用 Windows 原生部署的严格 UTF-8、有界输出、唯一目录及精确资源清理。本机缓存、状态和打包目录固定于项目 `.tmp/`；远端只在服务工作目录的 `.tmp/` 下建立本轮唯一目录，不回退系统临时目录。prepare 输出本机 server/helper SHA256；远端展开后分别核对 GetFileHash，助手验证自身位于本轮目录及两份哈希，每轮启动固定路径的服务前再次核验。GUI 模式运行 Token/匿名两轮，只监听目标机回环，不替换主服务。Win32 消息循环固定在独立 OS 线程，启用每显示器 DPI 感知；每次输入前核对自己 HWND 的前台身份，键盘及文本另核对自己的 EDIT 焦点。裁剪区域必须完全位于窗口客户区和选中显示器内，通过实际 PNG 像素验证四色标记；使用该截图的 capture_id 进行输入。原生 Unicode 路线不读取或写入 Clipboard。
+
+最终报告包含 `gui_exercised=true`、`clipboard_accessed=false`、`acceptance_complete=false`，两轮实际事件、区域/标记核验、UTF-8 控件文字核验、前台守卫、重复关闭及窗口清理证据。PNG 只保留摘要；GUI 失败可输出最多 16 KiB 的白名单数值诊断（阶段、区域、绘制次数/失败位、四色中心 RGB/不匹配数/颜色计数、本窗口与桌面 DC 四点 RGB/有效性、可见/最小化/遮蔽状态、截图尝试数、哈希、清理阶段），不输出图像、文字、Token 或完整目录。每次专用窗口截图准备允许共用最多 3 秒 context、间隔 50 毫秒且最多 61 次只读截图，每次前后核对同一前台 HWND 和客户区几何，仍必须满足四个 7×7 精确颜色断言；不重试任何输入。绘制/截图断言失败的原始英文原因与清理失败分列，已有进程 Wait 结束后仅对本轮目录有界等待最多 5 秒释放，不扫描或删除其他资源。主服务仍可发现工具且临时部署清理完成后才发布成功报告。多屏/混合缩放、布局变化、撤权、实际 MCP 客户端展示及 Windows/arm64 原生运行继续 pending。
+
+### 4. 校验与失败矩阵
+| 条件 | 结果 |
+| --- | --- |
+| 未指定 --execute | 显示帮助，不部署、不打开窗口 |
+| 窗口启动超时、关闭或焦点不属于本轮窗口 | 有界失败并清理，不向未知窗口输入 |
+| 上传、实际启动的二进制哈希不符 | 失败，不启动测试服务 |
+| PNG 区域、标记或元数据不符 | 失败，不凭截图调用成功宣称坐标正确 |
+| EDIT 文字、真实鼠标/组合键事件不符 | 失败，submitted 不算验收证据 |
+| 窗口、测试服务或部署目录清理失败 | 不发布成功报告 |
+
+### 5. 正常、边界与失败案例
+正常：七个 GUI 工具发现与 Windows 能力探测 → 打开专用窗口 → 裁剪及四色核验 → 实际鼠标/滚轮/全选清空 → 中文及 emoji 入控件 → 再截图 → 重复关闭 → 销毁窗口并注销类 → 清理部署 → 复查主入口。边界：单屏 100% 环境通过仍不能算混合 DPI 或 Windows/arm64 原生成功。失败：窗口失去前台身份时中止输入，不去控制当前其他应用。
+
+### 6. 必需测试与断言
+PNG 完整解码、区域/标记错误、图像限额、有界协议响应、摘要真实性、--execute 与旧模式分离须有离线回归；新增 Win32 ABI/启动清理代码须做对应 Windows 构建。原生运行必须断言真实点击、双击、拖拽、水平/垂直滚轮、Ctrl+A/Backspace 清空和 WM_GETTEXT 的完整 Unicode 文字，且成功摘要发布前确认窗口已销毁、类已注销。构建结果与实际桌面证据分别记录。
+
+### 7. 错误方式与正确方式
+错误：在工作线程调用 GetFocus 代替窗口 UI 线程的焦点，或 startup 超时后丢弃尚未退出的窗口线程，再提前报告 window_cleaned。
+
+正确：通过有界 UI 线程消息核验 EDIT 焦点；启动、异常和成功路径都持有窗口生命周期，销毁窗口并注销类后再确认清理，无法确认则失败。

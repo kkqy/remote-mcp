@@ -74,6 +74,10 @@ func TestToolFailureLoggingIndependentHTTP(t *testing.T) {
 				{"process_start", map[string]any{"request_id": "log-schema", "command": "echo", "wait_ms": secret}, "argument_type_mismatch", "Tool argument type does not match its declaration"},
 				{"process_status", secret, "invalid_argument_json", "Tool arguments must be a valid JSON object"},
 			}
+			if !gui.Supported {
+				cases[0].code = "unknown_tool"
+				cases[0].reason = "Requested tool is not registered"
+			}
 			for _, item := range cases {
 				t.Run(item.name+"/"+item.code, func(t *testing.T) {
 					envelope, line := call(item.name, item.arguments)

@@ -143,6 +143,50 @@ class ReportTest(unittest.TestCase):
 
 
 class ProtocolTest(unittest.TestCase):
+    def tools_protocol(self, service_os):
+        names = ["environment_inspect", "process_inspect", "network_listeners", "network_probe",
+                 "file_list", "file_read", "file_search", "file_patch", "log_open", "log_read", "log_close",
+                 "process_read", "terminal_read"]
+        names.extend("existing_tool_" + str(index) for index in range(33 - len(names)))
+        if service_os == "windows":
+            names.extend(("gui_status", "gui_open", "gui_close", "gui_screenshot", "gui_mouse", "gui_key", "gui_text"))
+        tools = [{"name": name, "inputSchema": {"properties": {"wait_ms": {"type": "integer"}}}, "outputSchema": {"type": "object"}} for name in names]
+        protocol = MagicMock()
+        protocol.rpc.return_value = {"tools": tools}
+        protocol.tool.return_value = {"ok": True, "os": service_os}
+        return protocol, tools
+
+    def test_discovery_uses_service_platform(self):
+        for service_os in ("linux", "windows"):
+            with self.subTest(service_os=service_os):
+                protocol, _ = self.tools_protocol(service_os)
+                p0.check_tools(protocol)
+                protocol.tool.assert_called_once_with("environment_inspect", {"runtimes": ["python"]})
+
+    def test_discovery_rejects_wrong_platform_counts_and_gui_names(self):
+        for service_os, mutation in (
+            ("linux", "extra"), ("linux", "gui"), ("windows", "missing"),
+            ("windows", "gui_name"), ("linux", "duplicate"), ("linux", "unknown_os"), ("linux", "failed_os"),
+        ):
+            with self.subTest(service_os=service_os, mutation=mutation):
+                protocol, tools = self.tools_protocol(service_os)
+                if mutation == "extra":
+                    tools.extend({"name": "unexpected_" + str(index)} for index in range(7))
+                elif mutation == "gui":
+                    tools[-1]["name"] = "gui_text"
+                elif mutation == "missing":
+                    del tools[-7:]
+                elif mutation == "gui_name":
+                    tools[-1]["name"] = "gui_unknown"
+                elif mutation == "duplicate":
+                    tools[-1] = tools[-2]
+                elif mutation == "unknown_os":
+                    protocol.tool.return_value["os"] = "darwin"
+                else:
+                    protocol.tool.return_value["ok"] = False
+                with self.assertRaises(AssertionError):
+                    p0.check_tools(protocol)
+
     def test_authorization_is_omitted_in_anonymous_mode(self):
         for token in ("", "fictional-token"):
             with self.subTest(token=token), patch.object(p0.urllib.request, "urlopen") as request:

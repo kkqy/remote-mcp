@@ -53,8 +53,8 @@ Go 服务的启动 JSON、普通日志，以及传输辅助命令的摘要和诊
 
 ### 5. 正常、边界与失败示例
 
-- 失败示例：`tool=gui_text failed=true error_code=clipboard_preservation_unavailable error_message="The Portal has not provided a reliable clipboard ownership and format snapshot"`，另有既有耗时字段。
-- 边界：匿名配置仍能看到工具名及原因；`mode=clipboard` 不应使恢复诊断失去其类别信息。
+- 失败示例：`tool=gui_text failed=true error_code=unsupported error_message="Clipboard text input is not supported on Windows"`，另有既有耗时字段。
+- 边界：匿名配置仍能看到工具名及原因；Windows 的 `mode=clipboard` 返回具体英文不支持原因。
 - 失败：工具文本块或 SDK 错误夹带虚构凭据、路径、输入文本时，日志不能包含它们；不能为了提供原因开启 SDK 全量调试日志。
 
 ### 6. 必需测试

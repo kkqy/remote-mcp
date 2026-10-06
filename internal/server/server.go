@@ -66,16 +66,19 @@ func New(c config.Config, diagnostics io.Writer) (*App, error) {
 		files.Close()
 		return nil, fmt.Errorf("Invalid forwarding configuration: %w", err)
 	}
-	graphics, err := gui.New(c.GUI)
-	if err != nil {
-		forwards.Close()
-		processes.Close()
-		files.Close()
-		return nil, fmt.Errorf("Invalid GUI configuration: %w", err)
+	var graphics *gui.Manager
+	if gui.Supported {
+		graphics, err = gui.New(c.GUI)
+		if err != nil {
+			forwards.Close()
+			processes.Close()
+			files.Close()
+			return nil, fmt.Errorf("Invalid GUI configuration: %w", err)
+		}
 	}
 	fileTools, err := fileops.New(fileops.DefaultConfig())
 	if err != nil {
-		graphics.Close()
+		closeGUI(graphics)
 		forwards.Close()
 		processes.Close()
 		files.Close()
@@ -84,7 +87,7 @@ func New(c config.Config, diagnostics io.Writer) (*App, error) {
 	inspector, err := inspection.New(inspection.DefaultConfig())
 	if err != nil {
 		fileTools.Close()
-		graphics.Close()
+		closeGUI(graphics)
 		forwards.Close()
 		processes.Close()
 		files.Close()
@@ -94,7 +97,7 @@ func New(c config.Config, diagnostics io.Writer) (*App, error) {
 	if err != nil {
 		inspector.Close()
 		fileTools.Close()
-		graphics.Close()
+		closeGUI(graphics)
 		forwards.Close()
 		processes.Close()
 		files.Close()
@@ -107,7 +110,9 @@ func New(c config.Config, diagnostics io.Writer) (*App, error) {
 	files.Register(app.MCP)
 	processes.Register(app.MCP)
 	forwards.Register(app.MCP)
-	graphics.Register(app.MCP)
+	if graphics != nil {
+		graphics.Register(app.MCP)
+	}
 	fileTools.Register(app.MCP)
 	inspector.Register(app.MCP)
 	logFiles.Register(app.MCP)
@@ -177,10 +182,17 @@ func New(c config.Config, diagnostics io.Writer) (*App, error) {
 	return app, nil
 }
 
+func closeGUI(manager *gui.Manager) error {
+	if manager == nil {
+		return nil
+	}
+	return manager.Close()
+}
+
 func (a *App) Close() error {
 	a.once.Do(func() {
 		a.closing.Store(true)
-		a.closeErr = errors.Join(a.logs.Close(), a.inspection.Close(), a.fileops.Close(), a.gui.Close(), a.forwarding.Close(), a.execution.Close(), a.files.Close())
+		a.closeErr = errors.Join(a.logs.Close(), a.inspection.Close(), a.fileops.Close(), closeGUI(a.gui), a.forwarding.Close(), a.execution.Close(), a.files.Close())
 		for session := range a.MCP.Sessions() {
 			a.closeErr = errors.Join(a.closeErr, session.Close())
 		}

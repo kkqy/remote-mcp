@@ -28,7 +28,7 @@ func register[I, O any](s *mcp.Server, name, description string, fn func(context
 }
 func (m *Manager) Register(s *mcp.Server) {
 	register(s, "gui_status", "Query the current GUI backend or session capabilities without requesting desktop authorization.", m.Status)
-	register(s, "gui_open", "Open a GUI session for the current user; Wayland may require local authorization.", m.Open)
+	register(s, "gui_open", "Open a Windows GUI session for the current user on the interactive desktop.", m.Open)
 	register(s, "gui_close", "Close a GUI session and release desktop authorization, input, and capture resources.", m.CloseSession)
 	mcp.AddTool(s, &mcp.Tool{Name: "gui_screenshot", Description: "Capture an authorized display or a region as a PNG at its original size; use its image coordinates for subsequent mouse operations."}, func(ctx context.Context, _ *mcp.CallToolRequest, in ScreenshotInput) (*mcp.CallToolResult, any, error) {
 		out, err := m.Screenshot(ctx, in)
@@ -41,5 +41,5 @@ func (m *Manager) Register(s *mcp.Server) {
 	})
 	register(s, "gui_mouse", "Move, click, double-click, drag, or scroll using pixel coordinates in a valid screenshot; capture again to verify the result.", m.Mouse)
 	register(s, "gui_key", "Submit a single key or key combination and release the keys pressed by this call; some events may take effect before a failure.", m.Key)
-	register(s, "gui_text", "Enter UTF-8 text. Clipboard mode preserves and restores existing content by default; if preservation is unreliable, replacement requires explicit permission.", m.Text)
+	register(s, "gui_text", "Enter UTF-8 text using native Unicode input on Windows without clipboard access; explicit clipboard mode is unsupported. Some events may take effect before a failure.", m.Text)
 }

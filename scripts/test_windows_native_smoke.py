@@ -32,7 +32,7 @@ class ScriptTests(unittest.TestCase):
         FakeProtocol.instances = 0
         FakeProtocol.fail_preserved = False
 
-    def invoke(self, root, *, cleanup_failure=False, report_failure=False, failed_helper=False):
+    def invoke(self, root, *, cleanup_failure=False, report_failure=False, failed_helper=False, working_dir="C:\\workspace"):
         binary_dir = root / "windows-amd64"
         binary_dir.mkdir()
         (binary_dir / "remote-mcp.exe").write_bytes(b"fake binary")
@@ -40,8 +40,13 @@ class ScriptTests(unittest.TestCase):
         report.write_text('{"ok":true,"old":true}', encoding="utf-8")
         output = io.StringIO()
         def powershell(_protocol, code, **_kwargs):
+            self.assertNotIn("GetTempPath", code)
             if "ConvertTo-Json" in code:
-                return json.dumps({"platform": "Win32NT", "arch": "X64", "temp": "C:\\Temp\\"})
+                self.assertIn("Get-Location", code)
+                self.assertIn("GetFullPath", code)
+                return json.dumps({"platform": "Win32NT", "arch": "X64", "work_directory": working_dir})
+            if "CreateDirectory" in code or "Remove-Item" in code:
+                self.assertIn("C:\\workspace\\.tmp\\remote-mcp-native-", code)
             if cleanup_failure and "Remove-Item" in code:
                 raise RuntimeError("Cleanup failed")
             return ""
@@ -53,7 +58,7 @@ class ScriptTests(unittest.TestCase):
                    "rounds": [{"suite": suite, "authentication": mode, "ok": True, "service_shutdown": "terminate_process"}
                               for suite in ("legacy", "p0") for mode in ("token", "anonymous")]}
         execution = (1, {"stdout": "", "stderr": "Native fixture failed"}) if failed_helper else (0, {"stdout": json.dumps(summary), "stderr": ""})
-        with patch.object(native.tempfile, "gettempdir", return_value=str(root)), patch.object(native, "Protocol", FakeProtocol), patch.object(native, "powershell", side_effect=powershell), patch.object(native, "prepare_archive", side_effect=archive), patch.object(native, "upload"), patch.object(native, "run_remote", return_value=execution), patch.object(native.sys, "argv", ["windows-native-smoke.py", "--url", "http://authorized.example/mcp", "--bin-dir", str(binary_dir), "--report-file", str(report), "--skip-package-tests"]), contextlib.redirect_stdout(output):
+        with patch.object(native.tempfile, "gettempdir", side_effect=AssertionError("禁止系统临时目录回退")), patch.object(native, "workspace_temp", return_value=root), patch.object(native, "Protocol", FakeProtocol), patch.object(native, "powershell", side_effect=powershell), patch.object(native, "prepare_archive", side_effect=archive), patch.object(native, "upload"), patch.object(native, "run_remote", return_value=execution), patch.object(native.sys, "argv", ["windows-native-smoke.py", "--url", "http://authorized.example/mcp", "--bin-dir", str(binary_dir), "--report-file", str(report), "--skip-package-tests"]), contextlib.redirect_stdout(output):
             with patch.object(Path, "replace", side_effect=OSError("Report failed")) if report_failure else contextlib.nullcontext():
                 try:
                     native.main()
@@ -111,6 +116,41 @@ class ScriptTests(unittest.TestCase):
             self.assertFalse(report.exists())
             self.assertNotIn('"ok": true', output)
 
+    def test_remote_working_directory_must_be_confirmed_and_absolute(self):
+        for working in (None, "", "relative", "C:relative", "C:\\bad\x00", "x" * 32701):
+            with self.subTest(working=working), tempfile.TemporaryDirectory() as directory:
+                with self.assertRaises(AssertionError):
+                    self.invoke(Path(directory), working_dir=working)
+
+    def test_powershell_failure_does_not_dump_raw_stderr(self):
+        with patch.object(native, "run_remote", return_value=(1, {"stdout": "", "stderr": "private raw diagnostic"})), patch.object(Path, "write_text") as written:
+            with self.assertRaisesRegex(RuntimeError, "Remote PowerShell operation failed"):
+                native.powershell(object(), "fixed test command")
+            written.assert_not_called()
+
+    def test_archive_build_uses_only_workspace_temporary_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            temporary = native.workspace_temp(repository)
+            binaries = repository / "windows-amd64"
+            binaries.mkdir()
+            for name in ("remote-mcp.exe", "remote-mcp-transfer.exe"):
+                (binaries / name).write_bytes(b"fixed executable")
+            target = temporary / "archive.zip"
+            def build(command, **options):
+                environment = options["env"]
+                expected = {"TMPDIR": "native-temp", "TMP": "native-temp", "TEMP": "native-temp", "GOCACHE": "go-cache", "GOTMPDIR": "go-tmp"}
+                for name, folder in expected.items():
+                    self.assertEqual(Path(environment[name]), temporary / folder)
+                    self.assertTrue(Path(environment[name]).is_dir())
+                self.assertEqual((environment["GOOS"], environment["GOARCH"], environment["CGO_ENABLED"]), ("windows", "amd64", "0"))
+                Path(command[command.index("-o") + 1]).write_bytes(b"fixed helper")
+            with patch.object(native.subprocess, "run", side_effect=build) as executed, patch.object(native.tempfile, "gettempdir", side_effect=AssertionError("禁止系统临时目录回退")):
+                hashes = native.prepare_archive(repository, binaries, target, "amd64", ())
+            self.assertEqual(executed.call_count, 1)
+            self.assertEqual(set(hashes), {"server_sha256", "helper_sha256"})
+            self.assertTrue(target.exists())
+
     def test_invalid_endpoints_are_rejected_before_connecting(self):
         for endpoint in ("file:///tmp/data", "http://user:password@example/mcp", "http://example/mcp?token=secret", "http://example/mcp#fragment"):
             with self.subTest(endpoint=endpoint), patch.object(native.urllib.request, "build_opener") as opened:
@@ -121,6 +161,29 @@ class ScriptTests(unittest.TestCase):
     def test_redirects_are_rejected(self):
         with self.assertRaises(RuntimeError):
             native.NoRedirect().redirect_request(None, None, None, None, None, None)
+
+    def test_remote_managed_child_temp_env_uses_only_held_directory(self):
+        class Process:
+            start = None
+            def tool(self, name, arguments):
+                if name == "process_start":
+                    self.start = arguments
+                    return {"id": "owned"}
+                if name == "process_status":
+                    return {"state": "exited", "exit_code": 0}
+                if name == "process_stop":
+                    return {}
+                return {"truncated": False, "data_base64": "", "next_cursor": 0, "end_cursor": 0}
+        for directory in (None, "C:\\workspace\\.tmp\\held"):
+            with self.subTest(directory=directory):
+                process = Process()
+                native.run_remote(process, "owned.exe", [], directory)
+                if directory is None:
+                    self.assertNotIn("dir", process.start)
+                    self.assertNotIn("env", process.start)
+                else:
+                    self.assertEqual(process.start["dir"], directory)
+                    self.assertEqual(process.start["env"], {name: directory for name in ("TMPDIR", "TMP", "TEMP")})
 
     def test_remote_exit_drains_both_streams_to_end_cursor(self):
         class Process:

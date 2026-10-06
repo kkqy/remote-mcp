@@ -71,8 +71,17 @@ def sha256(data):
 
 
 def check_tools(protocol):
-    tools = {tool["name"]: tool for tool in protocol.rpc("tools/list", {})["tools"]}
-    assert len(tools) == 40, "Unexpected registered tool count"
+    listed = protocol.rpc("tools/list", {})["tools"]
+    tools = {tool["name"]: tool for tool in listed}
+    assert len(tools) == len(listed), "Duplicate registered tool names"
+    # 工具范围由远端服务平台决定，不能使用 Python 宿主系统代替。
+    environment = protocol.tool("environment_inspect", {"runtimes": ["python"]})
+    assert environment.get("ok") is True and environment.get("os") in ("linux", "windows"), "Unsupported or unconfirmed service platform"
+    windows = environment["os"] == "windows"
+    assert len(tools) == (40 if windows else 33), "Unexpected registered tool count for the service platform"
+    gui_tools = {"gui_status", "gui_open", "gui_close", "gui_screenshot", "gui_mouse", "gui_key", "gui_text"}
+    discovered_gui = {name for name in tools if name.startswith("gui_")}
+    assert discovered_gui == (gui_tools if windows else set()), "GUI tools do not match the service platform"
     for name in (
         "environment_inspect", "process_inspect", "network_listeners", "network_probe",
         "file_list", "file_read", "file_search", "file_patch", "log_open", "log_read", "log_close",

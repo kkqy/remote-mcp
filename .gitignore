@@ -7,6 +7,7 @@
 coverage.out
 
 # 本地凭据及临时文件
+/.tmp/
 .env
 *.token
 *.key
