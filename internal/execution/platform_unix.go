@@ -1,4 +1,4 @@
-//go:build linux || darwin
+//go:build linux
 
 package execution
 
@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -79,14 +78,8 @@ func startTerminal(cmd *exec.Cmd, columns, rows int, out io.Writer) (running, er
 	}
 	p := &unixProcess{cmd: cmd, terminal: f, readers: []*os.File{f}, copies: make(chan struct{}, 1), readerCount: 1}
 	go copyOutput(out, f, p.copies)
-	// Linux 的会话编号为组长PID；macOS 的 ps 使用会话标识，提前保存用于孤儿作业回收。
-	if runtime.GOOS == "linux" {
-		p.session = strconv.Itoa(cmd.Process.Pid)
-	} else {
-		if data, err := processTable("-p", strconv.Itoa(cmd.Process.Pid), "-o", "sess="); err == nil {
-			p.session = strings.TrimSpace(string(data))
-		}
-	}
+	// Linux 的会话编号为组长 PID，用于回收已经脱离父子关系的终端作业。
+	p.session = strconv.Itoa(cmd.Process.Pid)
 	return p, nil
 }
 func (p *unixProcess) PID() int { return p.cmd.Process.Pid }

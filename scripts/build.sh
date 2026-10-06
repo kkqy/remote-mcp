@@ -2,7 +2,7 @@
 set -euo pipefail
 # 从任何工作目录调用，产物统一写入仓库 dist 目录。
 cd "$(dirname "$0")/.."
-for target_os in linux darwin windows; do
+for target_os in linux windows; do
   for target_arch in amd64 arm64; do
     destination="dist/${target_os}-${target_arch}"
     mkdir -p "$destination"

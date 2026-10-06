@@ -287,20 +287,6 @@ func TestWindowsTCPFixturesAndBoundedAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-func TestMacOSParserFixtures(t *testing.T) {
-	items, truncated, err := parsePS(context.Background(), []byte(" 10 1 /Applications/中文 app\n11 10 child\n"), 10)
-	if err != nil || truncated || len(items) != 2 || items[0].Name != "/Applications/中文 app" || items[1].PPID != 10 {
-		t.Fatalf("ps fixture: %+v %v", items, err)
-	}
-	listeners, truncated, err := parseLsof(context.Background(), []byte("p10\x00c中文 app\x00\nf1\x00n127.0.0.1:8080\x00\nf2\x00n127.0.0.1:8080\x00\np11\x00f3\x00n[::1]:8443\x00\n"), 10)
-	if err != nil || truncated || len(listeners) != 2 || len(listeners[0].PIDs) != 1 || listeners[1].Address != "::1" {
-		t.Fatalf("lsof fixture %+v %v", listeners, err)
-	}
-	_, _, err = parseLsof(context.Background(), []byte("p2\x00nmalformed\x00"), 10)
-	if err == nil {
-		t.Fatal("invalid endpoint accepted")
-	}
-}
 func TestRealProcessAndListener(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("Native PID/listener acceptance is tracked separately")
@@ -354,27 +340,6 @@ func TestBoundedString(t *testing.T) {
 	}
 }
 
-func TestFixedCommandErrorReasonsAndCaptureStreams(t *testing.T) {
-	e := fixedCommandError(context.Background(), os.ErrInvalid, []byte("lsof: permission denied: sensitive-path"))
-	if e.Code != "permission_denied" || strings.Contains(e.Message, "sensitive-path") {
-		t.Fatal(e)
-	}
-	e = fixedCommandError(context.Background(), os.ErrInvalid, []byte("operation not permitted"))
-	if e.Code != "permission_denied" {
-		t.Fatal(e)
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	if fixedCommandError(ctx, os.ErrPermission, nil).Code != "cancelled" {
-		t.Fatal("cancel lost")
-	}
-}
-func TestLsofIPv6WildcardAndMultiOwner(t *testing.T) {
-	items, truncated, err := parseLsof(context.Background(), []byte("p10\x00f1\x00tIPv6\x00n*:8080\x00\np11\x00f2\x00tIPv6\x00n*:8080\x00\n"), 10)
-	if err != nil || truncated || len(items) != 1 || items[0].Address != "::" || len(items[0].PIDs) != 2 {
-		t.Fatalf("IPv6 wildcard fixture %+v %v", items, err)
-	}
-}
 func TestTLSFailureReasons(t *testing.T) {
 	cases := []struct {
 		err    error

@@ -116,7 +116,7 @@ class GUISmokeTest(unittest.TestCase):
         self.assertEqual(expected, "")
         self.assertEqual({operation["tool"] for operation in plan["operations"]}, {"gui_key", "gui_mouse"})
         self.assertEqual([operation["arguments"]["keys"] for operation in plan["operations"] if operation["tool"] == "gui_key"],
-                         [["Meta" if sys.platform == "darwin" else "Ctrl", "A"], ["Backspace"]])
+                         [["Ctrl", "A"], ["Backspace"]])
         for arguments in [["--fixture-inputs-only"], ["--fixture", "--fixture-inputs-only", "--refresh-clipboard-offer"],
                           ["--fixture", "--fixture-inputs-only", "--allow-clipboard-replace"]]:
             result = subprocess.run([sys.executable, str(Path(__file__).with_name("gui-smoke.py")), "--execute", *arguments],

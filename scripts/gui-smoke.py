@@ -244,7 +244,7 @@ def fixture_plan(point, allow_replace, inputs_only=False):
     operations = [
         {"tool": "gui_mouse", "arguments": {"action": "click", **point(320, 130)}},
         {"tool": "gui_text", "arguments": {"text": "旧内容", "allow_clipboard_replace": allow_replace}},
-        {"tool": "gui_key", "arguments": {"keys": ["Ctrl" if sys.platform != "darwin" else "Meta", "A"]}},
+        {"tool": "gui_key", "arguments": {"keys": ["Ctrl", "A"]}},
         {"tool": "gui_text", "arguments": {"text": text, "allow_clipboard_replace": allow_replace}},
         {"tool": "gui_mouse", "arguments": {"action": "click", **point(150, 260)}},
         {"tool": "gui_mouse", "arguments": {"action": "double_click", **point(320, 260)}},

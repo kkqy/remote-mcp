@@ -64,16 +64,6 @@ func runCommand(ctx context.Context, max int, path string, args ...string) ([]by
 	stdout, stderr, truncated, err := runCommandStreams(ctx, max, path, args...)
 	return append(stdout, stderr...), truncated, err
 }
-func fixedCommandError(ctx context.Context, err error, stderr []byte) *Error {
-	if ctx.Err() != nil {
-		return contextError(ctx.Err())
-	}
-	text := strings.ToLower(string(stderr))
-	if strings.Contains(text, "permission denied") || strings.Contains(text, "operation not permitted") {
-		return failure("permission_denied", "The fixed system command could not access data with the current permissions")
-	}
-	return systemError(err)
-}
 
 // LookPath 在 Unix 上可能把存在但不可执行的文件合并为 ErrNotFound。
 // 只对固定白名单名字补充权限识别，不执行 PATH 中不满足 LookPath 契约的候选。

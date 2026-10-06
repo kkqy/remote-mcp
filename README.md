@@ -13,7 +13,7 @@ go build -o bin/remote-mcp ./cmd/remote-mcp
 go build -o bin/remote-mcp-transfer ./cmd/remote-mcp-transfer
 ```
 
-You can start the server directly without configuring a token. Linux/macOS:
+未配置 Token 时可以直接启动。Linux：
 
 ```sh
 ./bin/remote-mcp
@@ -27,7 +27,7 @@ Windows PowerShell:
 
 Token authentication is optional. When `REMOTE_MCP_TOKEN` is unset or empty and `--token-file` is not specified, the service allows anonymous access: any client that can reach it can use the file and command permissions of the account running the service. If a token was previously set in your terminal, clear it before starting with `unset REMOTE_MCP_TOKEN` in Bash or `$env:REMOTE_MCP_TOKEN = $null` in PowerShell.
 
-To enable authentication, configure a nonempty token before starting. Linux/macOS:
+需要鉴权时，在启动前配置非空 Token。Linux：
 
 ```sh
 export REMOTE_MCP_TOKEN='replace-with-a-random-ascii-token'
@@ -151,7 +151,7 @@ The response includes a resource ID and status. `wait_ms` is limited to 10000 mi
 
 After calling `terminal_open`, use `id` and the Base64 field `data_base64` in subsequent `terminal_write` calls. For example, Unix `pwd` followed by a carriage return is `cHdkDQ==`; Ctrl+C is `Aw==`. `terminal_read` accepts `id`, `cursor`, and an optional `limit`. Terminal output is a combined stream that preserves ANSI/VT control sequences, with no separate stderr. Repeated input through the same ID preserves the working directory, environment variables, and foreground application state.
 
-`terminal_resize` accepts `id`, `columns`, and `rows`. The foreground program handles Ctrl+C input itself; use `terminal_close` for forced cleanup. Windows uses ConPTY, while Linux/macOS use PTY. By default, terminals are reclaimed after 30 minutes without API call activity; continuous output does not extend this period. After a brief network disconnection, use the original ID to continue.
+`terminal_resize` 接受 `id`、`columns` 和 `rows`。Ctrl+C 输入由前台程序自行响应，强制回收使用 `terminal_close`。Windows 使用 ConPTY，Linux 使用 PTY。终端默认无调用活动 30 分钟回收，持续输出不会延长这一时间；网络短暂断开后可凭原 ID 继续。
 
 ### A complete debugging workflow
 
@@ -191,15 +191,15 @@ python3 scripts/smoke.py --bin-dir dist/linux-amd64
 python3 scripts/smoke.py --bin-dir dist/linux-amd64 --no-token
 ```
 
-The build script generates `dist/{linux,darwin,windows}-{amd64,arm64}/`, with both programs in each combination. GitHub Actions runs native tests and race checks on Linux, Windows, and macOS, exercises an upload/run/download cycle with real binaries, and builds all six combinations. CI runs that have not actually been executed cannot be counted as passed local validation.
+当前仅支持 Linux 和 Windows 的 amd64/arm64，macOS 支持已移除。构建脚本生成 `dist/{linux,windows}-{amd64,arm64}/`，每种组合含两个程序。GitHub Actions 在 Linux、Windows 执行原生测试及竞态检查，并运行真实二进制上传、执行、下载闭环，另运行四组合构建；没有执行过的 CI 不能算验证通过。
 
 Linux also requires `procps` (or the distribution's equivalent package), which provides `/bin/ps`, to identify and clean up additional terminal job groups.
 
-The minimum target systems are Windows 10 1809+/Server 2019+, macOS 13+, and Linux 3.2+ with PTY support. These minimums come from Go 1.27 and ConPTY requirements and do not mean every older OS version has been tested.
+目标系统下限为 Windows 10 1809+/Server 2019+、Linux 3.2+ 且具有 PTY。下限来自 Go 1.27 和 ConPTY 的要求，不表示每个旧系统版本均已测试。
 
-The current development environment is Linux/amd64. Native terminal behavior, file replacement, and process tree cleanup on Windows/macOS still require tests on those systems; cross-compilation only demonstrates that the programs build. The project does not include a frontend, public relay, multi-tenant isolation, a dedicated breakpoint debugging protocol, or automatic system service installation.
+当前开发环境为 Linux/amd64。Windows/amd64 虚拟机已通过原生包测试和真实二进制闭环，包含终端、文件替换及进程树清理；Windows/arm64 目前仅构建通过。没有前端、公网中转、多租户隔离、专用断点调试协议或自动安装系统服务功能。
 
-Windows CI previously exposed a problem where redirected host standard input/output caused ConPTY sessions to use host handles incorrectly. The startup parameters have been fixed, with regression tests added for interaction, Ctrl+C, and idle cleanup when the host uses pipe or file redirection. The Windows native results after the fix still need CI confirmation.
+Windows CI 曾发现宿主标准输入输出重定向导致 ConPTY 会话误用宿主句柄的问题，已修正启动参数，并增加管道及文件重定向宿主下的交互、Ctrl+C 和空闲回收回归。对应回归已在 Windows/amd64 虚拟机实际通过；本轮未触发远程 CI。
 
 The recorded Linux/amd64 validation passed race tests, static analysis, an upload/run/download cycle with real binaries, and an actual 257 MiB bidirectional MCP transfer. The large-file test took approximately 29.74 seconds, with a sampled peak heap increase of about 9.46 MiB and matching SHA-256 hashes at both ends. A sampled heap increase is not equivalent to operating system RSS.
 
@@ -220,7 +220,7 @@ The recorded Linux/amd64 validation passed race tests, static analysis, an uploa
 | `file_search` | `path/query` 区分大小写的字面子串；可配置深度、条目、字节和命中预算 |
 | `file_patch` | `path/expected_sha256/edits` 校验原内容后修改已有普通 UTF-8 文件 |
 
-巡检默认总预算 5 秒，`timeout_ms` 最多 10000；最多 4 个并发巡检。快照默认返回 256 项，单次最多 4096，内部 PID/FD 扫描也有界。返回 `partial/warnings/truncated/visibility` 表示权限、依赖、扫描上限或可见性缺口；空列表不证明整机没有对象。Linux 使用当前 `/proc` namespace，Windows 使用 Toolhelp 与 IP Helper，macOS 使用固定 `/bin/ps` 和 `lsof` 参数；缺少依赖或权限不足提供英文代码与具体原因。运行时探测使用服务账号 PATH，不采集完整环境变量或进程命令行。
+巡检默认总预算 5 秒，`timeout_ms` 最多 10000；最多 4 个并发巡检。快照默认返回 256 项，单次最多 4096，内部 PID/FD 扫描也有界。返回 `partial/warnings/truncated/visibility` 表示权限、依赖、扫描上限或可见性缺口；空列表不证明整机没有对象。Linux 使用当前 `/proc` namespace，Windows 使用 Toolhelp 与 IP Helper；缺少依赖或权限不足提供英文代码与具体原因。运行时探测使用服务账号 PATH，不采集完整环境变量或进程命令行。
 
 网络探测沿 DNS→TCP→TLS→HTTP 共用一个 deadline。失败仍保留 `structuredContent` 中的 `stages/failed_stage/code/message`；IP 字面量可跳过 DNS。TLS 使用系统 CA 校验证书，HTTP 固定一次 GET，不走代理、不跟随重定向、不读取正文；HTTP 4xx/5xx 是有效协议响应，业务健康由调用方判断。例如：
 
@@ -250,14 +250,44 @@ The recorded Linux/amd64 validation passed race tests, static analysis, an uploa
 
 错误哈希或已观测到的外部修改返回 `conflict` 并保留现有目标。同目录临时文件校验、同步、关闭后才原子替换，失败清理临时名称；本模块补丁串行执行。请求断开或等待取消后，应重新 `file_read` 核对实际 hash，再决定下一步，不盲目重试旧 hash。最终哈希复核与发布之间仍存在外部非合作写入窗口，不提供严格文件系统 CAS。权限保持遵循平台可移植权限位，不能把它等同于 Windows 自定义 ACL 的完整复制。取消在文件系统操作之间检查，无法强制中断已阻塞的内核文件操作。
 
-普通日志只记录工具、耗时、结果及受控英文错误码与原因，不记录文件内容、query、edits、URL、运行时版本输出或凭据。Linux 本机测试与六组无 CGO 构建分别验收，Windows/macOS 原生 PID、端口、终端和文件行为仍待对应平台验证；新增 P0 不消除 GUI 任务的原生验收缺口。DAP、调试会话聚合、诊断包、反向隧道和新增 GUI 留待后续。
+普通日志只记录工具、耗时、结果及受控英文错误码与原因，不记录文件内容、query、edits、URL、运行时版本输出或凭据。Linux 本机测试与四组无 CGO 构建分别验收，Windows/amd64 原生 PID、端口、终端和文件行为已通过虚拟机验收，Windows/arm64 仍仅构建通过；新增 P0 不消除 GUI 任务的原生验收缺口。DAP、调试会话聚合、诊断包、反向隧道和新增 GUI 留待后续。
 
-真实本机二进制闭环（不访问 GUI 或公网）：
+真实本机二进制闭环（不访问 GUI 或公网），Linux 使用本机 Go 构建产物：
 
 ```sh
-python3 scripts/p0-smoke.py --bin-dir dist/linux-amd64
-python3 scripts/p0-smoke.py --bin-dir dist/linux-amd64 --no-token
+CGO_ENABLED=0 go build -o bin/ ./cmd/...
+python3 scripts/smoke.py --bin-dir bin
+python3 scripts/smoke.py --bin-dir bin --no-token
+python3 scripts/p0-smoke.py --bin-dir bin --report-file dist/p0-token.json
+python3 scripts/p0-smoke.py --bin-dir bin --no-token --report-file dist/p0-anonymous.json
 ```
+
+Windows PowerShell：
+
+```powershell
+$env:CGO_ENABLED = '0'
+go build -o bin/ ./cmd/...
+Remove-Item Env:CGO_ENABLED
+python scripts/smoke.py --bin-dir bin
+python scripts/smoke.py --bin-dir bin --no-token
+python scripts/p0-smoke.py --bin-dir bin --report-file dist/p0-token.json
+python scripts/p0-smoke.py --bin-dir bin --no-token --report-file dist/p0-anonymous.json
+```
+
+已有四组合构建产物也可通过 `--bin-dir dist/linux-amd64` 等目录验证，目录必须对应正在运行的系统与架构。P0 冒烟覆盖工具发现、当前 PID 与监听端口、回环网络成功和失败、中文 CRLF 补丁与冲突保留、进程及真实终端的立即读取/输出等待/超时/退出、日志追加/轮转/同文件截断。服务及测试资源清理和普通日志过滤全部通过后，才输出成功摘要，并按可选 `--report-file` 保存严格 UTF-8 的有限 JSON 报告。每次运行先删除该位置的旧报告，失败不留下旧成功记录；报告只包含检查布尔值、协议及鉴权模式、服务端系统/架构和 Python 宿主系统/架构，不保存凭据、用户内容、路径、主机名或进程列表。Windows 服务停止使用 `TerminateProcess`，报告明确标注 `service_shutdown=terminate_process`，不表示服务收到信号后优雅退出。
+
+现有 Linux/Windows CI 入口执行旧功能与 P0 的 Token/匿名四轮冒烟，原生构建步骤明确关闭 CGO，竞态检查保留所需配置，四组合构建继续独立执行；P0 报告保存到按 runner 平台命名的 artifact，成功模式分别留证。Linux/amd64 和 Windows/amd64 实际旧功能/P0 × Token/匿名四轮冒烟均通过，Windows 九个包合计 111 个顶层测试通过、4 个按平台或条件跳过。本轮未触发远程 CI；CI 配置或 artifact 名称不能代替实际结果。Windows 虚拟机缺少 Python，实际验收使用下面的 Go 助手方式，未在 Windows 执行上述 Python 冒烟脚本。Windows/arm64 只有构建结果，虚拟机没有运行 Windows race 检测，GUI 保留独立验收边界。
+
+目标 Windows 没有 Python 时，在本机通过**已授权的**现有 MCP 入口部署预编译 Go 助手：
+
+```sh
+python3 scripts/windows-native-smoke.py \
+  --url http://windows-host:8080/mcp \
+  --bin-dir dist/windows-amd64 \
+  --report-file dist/windows-native.json
+```
+
+该脚本只使用唯一临时目录和独立回环服务，完成后清理并重新确认原入口可用，保留原服务与配置。`--skip-package-tests` 仅跑四轮服务闭环；可重复 `--package` 选择包，`--package-only` 仅跑包测试，其报告 `protocol_smoke=false`，不能代表四轮成功。报告只含有限检查结果与上传产物哈希，不记录凭据、目录或用户内容。
 
 ## 图形桌面截图与操作
 
@@ -278,7 +308,6 @@ GUI 工具使用原有 `/mcp` 入口、匿名或可选 Token 模式，只操作�
 ### 授权与平台依赖
 
 - **Windows**：当前交互桌面上的原生截图与输入。系统的 UIPI 权限限制可能拒绝对更高权限应用输入；不控制安全桌面或 Windows 服务会话。
-- **macOS**：分别授予“屏幕录制”和“辅助功能”权限。采集权限不能代替输入权限；授权后可能需要按系统提示重新启动服务。
 - **Linux X11**：运行账号需要连接当前 X 显示服务器，并具备 XTEST 输入扩展。能力以实际连接及扩展探测为准。
 - **Linux Wayland**：首版完整操作目标为 GNOME/Mutter 和 KDE Plasma/KWin。需要当前用户会话 D-Bus、PipeWire、`xdg-desktop-portal` 及与桌面匹配的 GNOME/KDE Portal 后端，并安装 `gst-launch-1.0`、`gst-inspect-1.0` 和 `pipewiresrc/videoconvert/pngenc/fdsink` 插件。Go 二进制仍无需 CGO，桌面采集依赖系统组件。
 
@@ -323,11 +352,11 @@ Wayland 的绝对坐标还要求可用的逻辑布局监视器：GNOME 使用 Mu
 {"id":"会话 ID","text":"你好，图形桌面","mode":"auto"}
 ```
 
-`mode` 为 `auto/direct/clipboard`；默认 `auto` 优先直接文本输入，否则采用剪贴板粘贴。Windows/macOS 当前使用原生 Unicode 输入，显式 `clipboard` 模式返回 `unsupported`；各后端实际能力见 `gui_status`。兼容模式先可靠保存原内容及 MIME 信息，粘贴后恢复；默认 `allow_clipboard_replace: false`。无法可靠保留时返回 `clipboard_preservation_unavailable`，不会直接覆盖剪贴板。明确接受替换时可设为 `true`，结果会标明替换与恢复状态。发现其他应用已经改变剪贴板时不覆盖其新内容；恢复失败明确报告，不把部分输入失败包装为无副作用。
+`mode` 为 `auto/direct/clipboard`；默认 `auto` 优先直接文本输入，否则采用剪贴板粘贴。Windows 当前使用原生 Unicode 输入，显式 `clipboard` 模式返回 `unsupported`；各后端实际能力见 `gui_status`。兼容模式先可靠保存原内容及 MIME 信息，粘贴后恢复；默认 `allow_clipboard_replace: false`。无法可靠保留时返回 `clipboard_preservation_unavailable`，不会直接覆盖剪贴板。明确接受替换时可设为 `true`，结果会标明替换与恢复状态。发现其他应用已经改变剪贴板时不覆盖其新内容；恢复失败明确报告，不把部分输入失败包装为无副作用。
 
 部分 KDE Portal 在授权开始时仅订阅后续剪贴板变更，不发送现有格式；Clipboard v1 也没有查询全部现有格式的接口。此时默认输入返回 `clipboard_preservation_unavailable`，直到获得可确认的格式通知。服务不会自动改写剪贴板来探测初始内容。
 
-普通应用默认粘贴键为 Windows/Linux 的 Ctrl+V、macOS 的 Meta+V。终端等不同目标可明确提供 `"paste_keys":["Ctrl","Shift","V"]`。剪贴板授权和键盘授权都需要可用；目标控件可能不接受粘贴。工具和普通日志不会返回原剪贴板内容，也不会记录图像、输入文本或 Portal 恢复令牌。
+普通应用默认粘贴键为 Windows/Linux 的 Ctrl+V。终端等不同目标可明确提供 `"paste_keys":["Ctrl","Shift","V"]`。剪贴板授权和键盘授权都需要可用；目标控件可能不接受粘贴。工具和普通日志不会返回原剪贴板内容，也不会记录图像、输入文本或 Portal 恢复令牌。
 
 | 配置参数 | 默认值 |
 | --- | --- |

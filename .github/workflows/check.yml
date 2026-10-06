@@ -1,4 +1,4 @@
-name: 三平台验证
+name: Linux 与 Windows 验证
 on:
   push:
   pull_request:
@@ -9,7 +9,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -20,8 +20,19 @@ jobs:
       - run: go vet ./...
       - run: go test -race -count=1 ./...
       - run: go build -o bin/ ./cmd/...
-      - run: python -m unittest discover -s scripts -p test_smoke.py
+        env:
+          CGO_ENABLED: '0'
+      - run: python -m unittest discover -s scripts -p "test*smoke.py"
       - run: python scripts/smoke.py --bin-dir bin
+      - run: python scripts/smoke.py --bin-dir bin --no-token
+      - run: python scripts/p0-smoke.py --bin-dir bin --report-file reports/p0-token.json
+      - run: python scripts/p0-smoke.py --bin-dir bin --no-token --report-file reports/p0-anonymous.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p0-native-${{ matrix.os }}
+          path: reports/p0-*.json
+          if-no-files-found: ignore
   cross-build:
     runs-on: ubuntu-latest
     steps:
