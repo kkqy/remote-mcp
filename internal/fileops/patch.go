@@ -127,7 +127,7 @@ func verifyTarget(ctx context.Context, path string, before os.FileInfo, original
 	if closeErr != nil {
 		return ioError(closeErr)
 	}
-	latest, statErr := os.Lstat(path)
+	latest, statErr := statPath(path)
 	if statErr != nil || !latest.Mode().IsRegular() || !os.SameFile(before, named) || !os.SameFile(before, latest) || stats.digest != originalHash || latest.Size() != before.Size() || !latest.ModTime().Equal(before.ModTime()) {
 		return failure("conflict", "Target identity or content changed before patch publication")
 	}

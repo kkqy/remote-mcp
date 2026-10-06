@@ -1,4 +1,4 @@
-//go:build linux || darwin
+//go:build linux
 
 package logstream
 
@@ -6,6 +6,8 @@ import (
 	"golang.org/x/sys/unix"
 	"os"
 )
+
+func statPath(path string) (os.FileInfo, error) { return os.Lstat(path) }
 
 // 非阻塞且拒绝符号链接，避免路径检查后被替换为管道或链接而挂起。
 func openFile(path string) (*os.File, error) {

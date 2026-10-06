@@ -59,14 +59,19 @@ func fileError(err error) error {
 	}
 }
 func openRegular(path string) (*os.File, os.FileInfo, error) {
-	info, err := os.Lstat(path)
+	return openRegularWith(path, openFile)
+}
+
+// 打开器可注入准确的路径替换窗口；正式打开保留平台的无跟随约束。
+func openRegularWith(path string, open func(string) (*os.File, error)) (*os.File, os.FileInfo, error) {
+	info, err := statPath(path)
 	if err != nil {
 		return nil, nil, fileError(err)
 	}
 	if !info.Mode().IsRegular() {
 		return nil, nil, failure("not_regular", "The log path must identify a regular file without a symbolic link")
 	}
-	f, err := openFile(path)
+	f, err := open(path)
 	if err != nil {
 		return nil, nil, fileError(err)
 	}
@@ -134,7 +139,7 @@ func (r *resource) read(in ReadInput) (ReadResult, error) {
 	if r.closed {
 		return ReadResult{}, failure("closed", "The log resource is closed")
 	}
-	info, err := os.Lstat(r.path)
+	info, err := statPath(r.path)
 	if err != nil {
 		return ReadResult{}, fileError(err)
 	}

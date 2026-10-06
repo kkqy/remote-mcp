@@ -406,7 +406,7 @@ func TestRevalidationDetectsIdentityAndHashChanges(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file")
 	writeText(t, path, "original")
-	before, err := os.Stat(path)
+	before, err := statPath(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -416,7 +416,7 @@ func TestRevalidationDetectsIdentityAndHashChanges(t *testing.T) {
 	}
 	requireCode(t, verifyTarget(context.Background(), path, before, digest([]byte("original")), DefaultConfig()), "conflict")
 	writeText(t, path, "original")
-	before, err = os.Stat(path)
+	before, err = statPath(path)
 	if err != nil {
 		t.Fatal(err)
 	}

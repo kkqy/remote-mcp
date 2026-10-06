@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -218,7 +217,7 @@ func probeError(ctx context.Context, stage string, err error) (*Error, string) {
 		return contextError(err), "cancelled"
 	}
 	var ne net.Error
-	if errors.As(err, &ne) && ne.Timeout() {
+	if errors.Is(err, connectionTimedOutErrno) || (errors.As(err, &ne) && ne.Timeout()) {
 		return failure("timeout", "The network stage exceeded the total time budget"), "timeout"
 	}
 	switch stage {
@@ -229,10 +228,10 @@ func probeError(ctx context.Context, stage string, err error) (*Error, string) {
 		}
 		return failure("dns_failed", "DNS name resolution failed"), "resolution_error"
 	case "tcp":
-		if errors.Is(err, syscall.ECONNREFUSED) {
+		if errors.Is(err, connectionRefusedErrno) {
 			return failure("tcp_failed", "The TCP connection was refused"), "refused"
 		}
-		if errors.Is(err, syscall.ENETUNREACH) || errors.Is(err, syscall.EHOSTUNREACH) {
+		if errors.Is(err, networkUnreachableErrno) || errors.Is(err, hostUnreachableErrno) {
 			return failure("tcp_failed", "The TCP target is unreachable"), "unreachable"
 		}
 		return failure("tcp_failed", "The TCP connection could not be established"), "connection_error"

@@ -82,7 +82,7 @@ func openPathWith(path string, directory bool, open func(string) (*os.File, erro
 	if strings.TrimSpace(path) == "" || strings.ContainsRune(path, '\x00') {
 		return nil, nil, failure("invalid_argument", "A non-empty valid path is required")
 	}
-	before, err := os.Lstat(path)
+	before, err := statPath(path)
 	if err != nil {
 		return nil, nil, ioError(err)
 	}
