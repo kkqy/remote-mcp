@@ -19,7 +19,7 @@
 - `gui_mouse(id, capture_id, action, x, y, ...)` 坐标相对输出图片，叠加裁剪偏移后按实际像素与逻辑尺寸换算。Wayland 向授权流提交局部坐标，原生后端按需加全局偏移。布局变化或记录过期使旧截图失效，不猜 1:1 比例。
 - Wayland 必须监视逻辑布局，不能只比较帧像素。GNOME 用 DisplayConfig，KDE 按当前 KScreen D-Bus 可用性探测，订阅后读取基线；配置变化、服务替换或监视断线使映射失效。没有可靠监视器则禁用绝对输入并说明原因；只读初始化不允许调用显示配置写入接口。
 - `gui_key(id, keys)` 一次提交完整组合键，最多 8 个，释放本次按键。拖拽最多 10000 毫秒，不提供跨调用长按。
-- `gui_text(id, text, mode?, paste_keys?, allow_clipboard_replace?)` 支持 UTF-8；默认 `auto` 优先原生 Unicode，再剪贴板。显式 `direct/clipboard` 不静默换模式。默认粘贴键 Windows/Linux 为 Ctrl+V，macOS 为 Meta+V。`submitted` 只代表提交事件，应用结果另验。
+- `gui_text(id, text, mode?, paste_keys?, allow_clipboard_replace?)` 支持 UTF-8；默认 `auto` 优先原生 Unicode，再剪贴板。显式 `direct/clipboard` 不静默换模式。默认粘贴键 Windows/Linux 为 Ctrl+V。`submitted` 只代表提交事件，应用结果另验。
 - 剪贴板默认保存所有支持格式后替换、恢复；无法保存则拒绝。只有 `allow_clipboard_replace=true` 允许省略保存。第三方新所有者出现时不覆盖，报告 `skipped_new_owner`。恢复所需惰性提供者保留有界旧快照直到接管或关闭；关闭后可读性单独验证。
 - KDE Portal 的 RequestClipboard 实现只订阅后续 offerChanged，没有初始格式读取接口。未收到可靠格式/所有权通知时必须拒绝默认粘贴，不猜测 text/plain 就宣称完整保存。缺失或非法的 MIME 字段不能被当成已知空剪贴板。测试可显式让专用窗口发布经完整读取和哈希确认的同内容 offer，不能混同为服务默认解决初始盲区。
 - KDE `application/x-kde-onlyReplaceEmpty` 是所有权控制格式，非空 selection 上原样恢复会被合成器拒绝；默认保存必须拒绝，测试准备及救援也不能删除标记后宣称完整恢复。SetSelection 期间的中间非 owner 通知不能提前丢弃 provider 数据；有界等待确认自身 owner 和目标格式集合完全一致，失败后才按实际所有权处理数据。
@@ -27,7 +27,7 @@
 - SetSelection 已提交但 owner 确认超时属于未知状态，中间非 owner 不能直接证明第三方接管；须保留有界恢复来源，不能误报 `skipped_new_owner`。关闭等待传输 goroutine 全部退出后清除原始 provider 和 recovery 数据，终态记录不能继续持有剪贴板字节。
 - 最多一个待授权或就绪会话。操作串行，真实忙时返回 `busy`，不建无界队列。取消等待不提前释放占用；底层完成、释放按键和占用后发布结果。
 - 默认：空闲 30 分钟，终态保留 10 分钟/256 条；授权 2 分钟，操作 30 秒；原图 16777216 像素/PNG 16 MiB；坐标记录 64 条/5 分钟；文本 64 KiB，剪贴板 1 MiB。分配或替换前限额，像素乘法用除法避免溢出。
-- CLI 为 `--gui-idle/--gui-authorize-timeout/--gui-operation-timeout/--gui-max-pixels/--gui-max-png-bytes`。六组合保持 `CGO_ENABLED=0`；Wayland 运行需用户 D-Bus、匹配 Portal、PipeWire、GStreamer 及采集插件。
+- CLI 为 `--gui-idle/--gui-authorize-timeout/--gui-operation-timeout/--gui-max-pixels/--gui-max-png-bytes`。Linux/Windows 四组合保持 `CGO_ENABLED=0`；Wayland 运行需用户 D-Bus、匹配 Portal、PipeWire、GStreamer 及采集插件。
 - 普通日志不输出文字、图片、剪贴板、Portal 令牌或辅助进程完整 stderr。Go 输出限额不等于第三方媒体进程的总 RSS 上限。
 
 ## 4. 校验与错误矩阵
@@ -64,7 +64,7 @@
 - `scripts/gui-smoke.py --execute --fixture` 只操作专用窗口，核对实际中文、组合键、点击、双击、拖拽、滚动；Wayland 窗口必须原生。剪贴板用只读哈希比较输入前、恢复后和关闭后的内容，不输出原文。
 - `--fixture-inputs-only` 只与专用窗口并用，不能与刷新或允许替换并用。首次焦点等待使用有界授权期限；后续每次操作仍短期限守卫。Qt 普通 QLineEdit 全选可能复制到 PRIMARY，因此该子集使用 Password 回显模式阻止自动复制，再核验组合键清空实际字段；不调用 gui_text 或剪贴板采样，中文恢复必须保留待验收。
 - 完整专用窗口也必须阻止 SelectAll 的自动 PRIMARY 复制：窗口处理真实 SelectAll 快捷键并直接选择字段，其余 Qt 输入路径保持；不能让验证准备改写 PRIMARY 后再把 Klipper 同步当成服务恢复结果。Qt offscreen 回归只证明隔离环境的控件行为，不能代替宿主剪贴板验收。
-- 跑全包 test/vet、本机 race、六组合构建和旧二进制冒烟。Windows/macOS/X11/GNOME/KDE、客户端图片展示及混合缩放分别记账；构建不是原生成功。
+- 跑全包 test/vet、本机 race、Linux/Windows 四组合构建和旧二进制冒烟。Windows/X11/GNOME/KDE、客户端图片展示及混合缩放分别记账；构建不是原生成功。2026-10-06 用户取消 macOS 支持，Darwin 后端及相关测试不再保留。
 
 ## 7. 错误方式与正确方式
 

@@ -19,6 +19,7 @@
 - 默认文件上限 8 MiB、响应文本/搜索预算 64 KiB，列表最多 1000 项，搜索最多 10000 条目/64 MiB 扫描/16 层/1000 命中。不得用无界 ReadDir(-1)、无限行缓冲或整棵目录内存快照绕过预算。
 - 补丁串行本模块修改；同目录临时文件保持权限、Sync/Close、发布前核对 identity/hash，复用 transfer.Publish(overwrite=true)。发现冲突必须保留原文件。Go Chmod 在 Unix 保持权限位，Windows 同目录临时文件继承目录 ACL，不能声称复制原目标的自定义 ACL、属主或扩展属性。跨非合作外部编辑器不提供严格文件系统 CAS；最终复核与平台替换之间的竞争窗口必须明确说明。
 - 路径在普通类型检查后、实际打开前仍可能被替换；Unix 使用 O_NONBLOCK/O_NOFOLLOW，Windows 使用 OPEN_REPARSE_POINT（目录同时使用 BACKUP_SEMANTICS），打开后再核对类型和 identity，防止被替换的管道阻塞或链接被跟随。此边界与不能强制取消已阻塞的正常内核 I/O 分别处理。
+- Windows 的 os.Stat/Lstat 可延迟到首次 SameFile 时才按路径查询文件 ID，不能用这种 FileInfo 作为不可变化的前置身份快照。fileops/logstream 的 statPath 在普通类型检查后以零访问、不跟随 reparse 的句柄立即 f.Stat，保持共享读写删除并关闭句柄；初始打开、最终路径复核及日志路径轮询均使用稳定快照。生产 Patch 的原 before 已来自 f.Stat；回归必须模拟实际稳定快照，不能把测试取样问题误写为主 before 原本失效。同大小、同内容并恢复 mtime 的文件替换仍须识别 conflict/新代际。
 
 ### 输出等待与日志
 - 执行 read 新增 wait_ms，范围 0..30000，省略/0 立即读取。字节游标、Base64、UTF-8 视图及 buffer truncated 仍是旧契约；不把字符数当字节偏移。
@@ -33,6 +34,7 @@
 - 运行时 go/node/python/java/dotnet 使用固定命令白名单与当前 PATH；缺失、版本查询失败或超时分别返回英文代码与原因。版本输出和系统名字是响应数据，不进入普通日志。
 - 内核版本读取失败时保留基本 os/arch，返回 partial 和带稳定错误码的受控英文 warning；Linux 可选 IPv6 表或进程目录访问失败同样按具体权限/缺失类别说明，不能统一伪报依赖缺失或普通 I/O 错误。
 - DNS→TCP→TLS→HTTP 共享同一个总 deadline，保留成功阶段及 failed_stage。IP 字面量可跳过 DNS；TLS 默认系统 CA，禁止跳过验证；HTTP 一次 GET、不走代理、不跟随重定向、不读正文、header 有界。HTTP 4xx/5xx 是协议响应成功，status_code 由调用者判断业务健康。
+- errno 分类使用平台原生常量。Linux 使用 syscall 的网络常量；Windows 使用 WSAECONNREFUSED/WSAENETUNREACH/WSAEHOSTUNREACH/WSAETIMEDOUT，不能把 syscall 的模拟 POSIX 值当成 Winsock 错误。被 net.OpError/os.SyscallError 包装后仍须识别 refused/unreachable/timeout，保持阶段错误码与完整阶段结果。
 - 默认预算 5 秒、上限 10 秒，最多 4 个并发巡检；默认返回 256 项、最多 4096，内部最多 16384 PID/65536 FD。外部固定命令输出最多 1 MiB，单名字/版本最多 1024 字节。固定命令取消后的遗留管道清理可额外等待最多 100 ms，WaitDelay 不保证任意 PATH 脚本的后代进程树回收；Windows 原生查询不可中途取消时，实际返回前保持并发占用。
 
 ## 4. 校验与错误矩阵
@@ -57,7 +59,7 @@
 
 ## 6. 必需验证
 文件模块验证中文、CRLF、末尾无换行、空文件、无效 UTF-8、长行跨块匹配、预算、错误哈希、并发补丁及注入发布失败，断言原文件与临时文件状态。等待验证延迟输出、空等待、退出尾部数据、取消、关闭及真实 PTY；日志验证追加、轮转、截断、代际、句柄上限与空闲清理。巡检验证本机真实父子 PID/监听 PID、平台解析 fixture 和网络各阶段失败/取消/超限。
-独立 HTTP JSON-RPC 验证工具发现、参数 schema、成功及 IsError/code/message，普通日志没有路径、URL、query、edits.text、运行时输出或 Token。全量 test/vet/race、六组合无 CGO 构建及真实二进制冒烟遵循质量规范；Windows/macOS 原生未运行必须标为未验证。
+独立 HTTP JSON-RPC 验证工具发现、参数 schema、成功及 IsError/code/message，普通日志没有路径、URL、query、edits.text、运行时输出或 Token。全量 test/vet/race、Linux/Windows 四组合无 CGO 构建及真实二进制冒烟遵循质量规范；Windows 原生未运行必须标为未验证。产品不再支持 macOS，不以删除支持宣称该平台已经验收。
 
 ## 7. 错误方式与正确方式
 错误：在只返回部分行后对预览计算 hash，拿此 hash 作为全文件修改前提；或先删除旧文件再写新内容。

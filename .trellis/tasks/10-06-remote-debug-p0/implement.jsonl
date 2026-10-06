@@ -6,3 +6,5 @@
 {"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "遵循后端现有契约与跨平台验证要求"}
 {"file": ".trellis/tasks/10-06-remote-debug-p0/research/inspection.md", "reason": "巡检平台能力与有界探测研究"}
 {"file": ".trellis/spec/backend/remote-debug.md", "reason": "三项 P0 的工具、预算、等待和哈希修改契约"}
+{"file": ".trellis/spec/backend/gui.md", "reason": "平台范围修订涉及删除 Darwin GUI 后端，保留 Linux/Windows 契约"}
+{"file": ".trellis/spec/backend/index.md", "reason": "用户明确取消 macOS 支持，当前仅 Windows/Linux 四组合"}

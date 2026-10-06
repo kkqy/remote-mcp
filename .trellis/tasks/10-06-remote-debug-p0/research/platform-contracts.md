@@ -1,5 +1,7 @@
 # 巡检平台契约核对
 
+范围修订（2026-10-06）：用户已取消 macOS 支持，以下 macOS 内容保留为早期设计与验证历史，不作为当前实现或验收要求。当前仅支持 Linux/Windows，Windows 虚拟机的实际结果另见 windows-native.md。
+
 实施代理已核对 Windows IP Helper 的一手 API/结构说明：
 
 - [GetExtendedTcpTable](https://learn.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getextendedtcptable)：查询大小后有界分配；owner PID LISTENER 类别为 3；IPv4/IPv6 地址族分别为 2/23。

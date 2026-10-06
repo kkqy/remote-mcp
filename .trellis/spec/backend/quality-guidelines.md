@@ -6,7 +6,7 @@
 - `go vet ./...`。
 - `go test ./...`。
 - 在支持竞态检测的本机环境运行 `go test -race ./...`。
-- `bash scripts/build.sh` 检查 Windows、Linux、macOS 的 amd64/arm64 构建。
+- `bash scripts/build.sh` 检查 Windows、Linux 的 amd64/arm64 四组合构建。
 - `python3 scripts/smoke.py --bin-dir dist/linux-amd64` 验证本机实际二进制闭环；其他平台改用对应二进制目录。
 
 必须验证真实边界：
@@ -19,9 +19,36 @@
 - Windows ConPTY 额外在宿主标准输入 EOF、标准输出/错误被重定向的独立进程中验证，防止沿用父标准句柄而读不到终端输入、输出泄漏或提前退出。Windows 测试可编译不等于该场景已原生运行通过。
 - 测试覆盖匿名及已配置 Token 两种模式；明确允许带 Token 的启动配置含凭据，同时验证普通日志脱敏。匿名启动配置须省略 headers，辅助命令不发送 Authorization，显式 Token 文件错误仍须失败。
 - Python 冒烟测试覆盖非 UTF-8 系统默认编码下的英文运行提示与 UTF-8 用户数据、子进程输出，显式使用 UTF-8 解码；最终日志检查或清理失败时不得提前输出 ok=true。
-- P0 远程调试验证使用 `scripts/p0-smoke.py` 与 `--no-token`，真实二进制覆盖巡检/等待/轮转/哈希补丁，不依赖公网或 GUI；最终成功摘要须在普通日志检查与服务清理后发布。
+- P0 远程调试验证使用 `scripts/p0-smoke.py` 与 `--no-token`，真实二进制覆盖巡检/等待超时与退出/日志轮转与同文件截断/哈希补丁，不依赖公网或 GUI；最终成功摘要须在资源关闭、服务清理和普通日志检查后发布。等待夹具必须保持输出闸门关闭来验证 timeout，打开退出闸门后读到 exit 并核对正常退出终态；真实终端初始化控制序列及分块输出须有界消耗。
+- P0 可选 `--report-file <path>` 每次运行先删除旧报告，只在全部验收通过后原子发布严格 UTF-8 JSON；失败不得留下旧成功或提前输出成功。摘要只含检查结果、鉴权模式、协议、服务 os/arch、Python 宿主系统/架构及 service_shutdown，不含凭据、用户内容、路径、主机名或进程列表。离线回归须覆盖鉴权两模式、非 UTF-8 默认编码、报告发布/清理失败和旧报告删除失败。
+- Windows Python terminate 调用 TerminateProcess；只有停止前服务仍运行且终止返回码为 1 时才接受这种预期清理，报告须标记 `service_shutdown=terminate_process`，不能宣称服务优雅退出。受管进程、终端和日志必须先逐项结束/关闭；提前崩溃或非预期退出仍失败。Linux 信号停止通过时报告 `graceful`。
+- 原生 CI 两平台执行旧功能/P0 × Token/匿名四轮冒烟，CGO_ENABLED=0 只设置在产物构建步骤，不能禁用竞态测试所需 CGO。有限 P0 报告分别保存在 runner artifact；四组合交叉构建继续独立运行，artifact 标签不能替代报告和实际执行结果。
 - 程序自身的错误、提示、CLI 帮助、MCP 工具及 schema 描述使用英文。Go AST 检查生产字符串字面量防止漏掉旧中文输出，排除注释、测试源码及动态用户内容；真实 HTTP/CLI 回归仍需核对英文诊断、稳定错误码和中文用户数据不被改写。
 
-平台报告分别写明构建通过、实际运行通过、未验证。Linux 上生成 Windows/macOS 二进制不能当成对应系统的终端验收通过；CI 文件也不能当成已经得到 CI 结果。
+平台报告分别写明构建通过、实际运行通过、未验证。Linux 上生成 Windows 二进制不能当成对应系统的终端验收通过；CI 文件也不能当成已经得到 CI 结果。macOS 支持已由用户取消，旧三平台历史记录不代表当前支持范围。
 
 测试失败先确认是否属于真实实现缺陷或执行环境限制。修复之后只重跑受影响检查及必要的集成检查，避免无依据重复扩大测试。
+
+## 无远端 Python 的 Windows 原生验收
+
+### 1. 范围与触发
+目标 Windows 环境没有 Python，但存在用户明确授权的匿名 MCP 入口时，使用本机部署脚本和标准库 Go 助手。该方式验证真实 Windows 行为，不能写成既有 Python 脚本已在 Windows 运行。
+
+### 2. 命令签名
+`python3 scripts/windows-native-smoke.py --url <已授权MCP入口> --bin-dir dist/windows-amd64 --report-file <本机报告>`；`--skip-package-tests` 仅执行四轮服务闭环。可重复 `--package <白名单包>` 选择独立包，`--package-only` 仅跑包测试，报告必须保留 protocol_smoke=false、空 rounds；不得与 --skip-package-tests 混用。Go 助手为 `scripts/native-smoke`，预编译到目标 Windows 架构后运行，不在虚拟机安装依赖。
+
+### 3. 输入与输出契约
+URL 必须显式提供，连接不使用代理或重定向，不携带 URL 凭据；远程系统与架构须匹配产物目录。只在唯一临时目录上传当前二进制、助手及必要的测试源文件/测试程序；测试服务只监听目标机回环。已有 MCP 主服务保持运行，结束后再次初始化并发现工具来确认仍可用。报告记录四轮鉴权/套件、原生系统架构、包测试通过/跳过数、服务二进制哈希及清理状态，不含目录、凭据或测试内容。
+
+### 4. 校验与失败
+协议响应及进程输出有界且严格 UTF-8；PowerShell 传输前显式设置 Console/OutputEncoding 为 UTF-8，不能忽略代码页错误。读取退出进程后仍按 end_cursor 消耗全部尾部输出。测试失败、超限、解码或清理失败时不得发布成功报告；本轮旧报告启动前删除。远端清理只使用持有的精确目录及资源 ID，不能按前缀删除其他会话资源。
+
+### 5. 正常与边界案例
+正常：通过匿名入口部署助手，在独立服务上完成旧功能/P0 × Token/匿名四轮，再清理并确认原入口可用。边界：远端 Python 缺失仍可运行预编译原生测试；无 Windows/arm64 机器时该架构只记录构建通过。失败：PowerShell 输出无法严格解码时中止并清理，不算业务测试通过。
+
+### 6. 必需断言
+助手核对真实 ConPTY 等待/超时/退出、PID/监听 PID、网络阶段、文件 CRLF/哈希冲突、日志轮转/截断和普通日志过滤。Windows 服务强制终止明确报告 terminate_process，提前退出拒绝；受管资源先完成关闭，部署目录清理成功后本机才发布最终摘要。新增辅助代码定向 vet/test/race 与 Windows 构建，脚本回归覆盖失败报告、输出尾部和编码边界；GUI 及未运行架构保留独立未验标记。
+
+### 7. 错误方式与正确方式
+错误：有界 writer 嵌入 bytes.Buffer，使 io.Copy 通过提升的 ReadFrom 绕开 Write 限额；或者捕获无界输出后才检查长度。
+正确：缓冲作为私有字段，在实际捕获路径限制字节数；使用隐藏 Reader.WriterTo 的真实 io.Copy 回归触发方法选择，断言超限失败且已有缓冲不增长。

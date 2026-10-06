@@ -11,7 +11,7 @@
 - `internal/inspection/`：系统/运行时、进程树、TCP 监听 PID 和有界分阶段网络探测。
 - `internal/forwarding/`：TCP 转发监听、双向流量复制、连接限额及规则生命周期。
 - `internal/gui/`：当前用户图形会话、截图坐标记录、输入串行、平台能力与授权及资源清理。
-- `scripts/build.sh`：六种系统/架构组合的两个程序构建。
+- `scripts/build.sh`：Linux/Windows × amd64/arm64 四种组合的两个程序构建。
 - `scripts/smoke.py`：使用实际二进制完成上传、独立协议调用、执行和下载校验。
 - `scripts/gui-smoke.py` 与 `scripts/gui_fixture.py`：独立 GUI 协议验证及显式启用的专用原生测试窗口。
 - `.github/workflows/check.yml`：跨平台检查配置；配置存在不代表远端已经执行成功。
