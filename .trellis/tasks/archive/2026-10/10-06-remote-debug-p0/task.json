@@ -3,7 +3,7 @@
   "name": "remote-debug-p0",
   "title": "远程调试三项 P0 能力",
   "description": "实现环境进程网络巡检、等待式日志读取和有界文件读取搜索补丁能力",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": "remote-debug",
   "package": null,
@@ -11,7 +11,7 @@
   "creator": "kkqy",
   "assignee": "kkqy",
   "createdAt": "2026-10-06",
-  "completedAt": null,
+  "completedAt": "2026-10-06",
   "branch": "codex/remote-debug-p0",
   "base_branch": "main",
   "worktree_path": null,
@@ -89,6 +89,6 @@
     "scripts/test_windows_native_smoke.py",
     "scripts/windows-native-smoke.py"
   ],
-  "notes": "三项P0已实施；Trellis全范围复审、全量test/vet/race、六组合两个入口无CGO构建、最终dist旧/P0 Token/匿名四轮冒烟和Python31项回归通过。Windows/macOS原生验收尚未执行，任务保留in_progress；旧GUI任务和.opencode/package.json保持。用户已确认两笔具体提交计划，实现提交为 0337ba2，文档随第二笔计划提交；不推送。 2026-10-06 用户提供 Windows 虚拟机匿名 MCP 环境，并明确取消整个项目 macOS 支持；正在收敛 Linux/Windows 四组合与执行隔离 Windows 原生验收，前述六组合与原生缺口为历史记录。本轮新增改动待复审和提交计划确认，不推送。 最终Linux/Windows范围已实现并复审通过；最新全量vet/test/race、四组合双入口无CGO构建、Linux四轮、Windows/amd64九包111PASS/4SKIP及四轮原生服务均通过。Python48项和Go助手4项通过，临时目录清理及原8080服务确认通过；Windowsarm64/race、GUI独立边界保留。新三笔工作及归档/日志具体清单见commit-platform-validation.md，待一次确认，暂不归档、不推送。 用户本轮回复“确认”批准commit-platform-validation.md；平台提交d08dc74与Windows修复提交22bd07c已完成，第三笔按已确认清单提交。随后仅归档当前P0并记录journal，不推送，旧GUI任务及用户文件保留。",
+  "notes": "三项P0已实施；Trellis全范围复审、全量test/vet/race、六组合两个入口无CGO构建、最终dist旧/P0 Token/匿名四轮冒烟和Python31项回归通过。Windows/macOS原生验收尚未执行，任务保留in_progress；旧GUI任务和.opencode/package.json保持。用户已确认两笔具体提交计划，实现提交为 0337ba2，文档随第二笔计划提交；不推送。 2026-10-06 用户提供 Windows 虚拟机匿名 MCP 环境，并明确取消整个项目 macOS 支持；正在收敛 Linux/Windows 四组合与执行隔离 Windows 原生验收，前述六组合与原生缺口为历史记录。本轮新增改动待复审和提交计划确认，不推送。 最终Linux/Windows范围已实现并复审通过；最新全量vet/test/race、四组合双入口无CGO构建、Linux四轮、Windows/amd64九包111PASS/4SKIP及四轮原生服务均通过。Python48项和Go助手4项通过，临时目录清理及原8080服务确认通过；Windowsarm64/race、GUI独立边界保留。新三笔工作及归档/日志具体清单见commit-platform-validation.md，待一次确认，暂不归档、不推送。 用户本轮回复“确认”批准commit-platform-validation.md；平台提交d08dc74与Windows修复提交22bd07c已完成，第三笔按已确认清单提交。随后仅归档当前P0并记录journal，不推送，旧GUI任务及用户文件保留。 三笔工作提交d08dc74/22bd07c/42aceb4已全部完成；按用户批准清单归档当前P0，旧GUI/首版/规范引导任务未归档。会话日志随后记录，未推送。",
   "meta": {}
 }
