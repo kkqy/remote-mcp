@@ -95,3 +95,43 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 4: 移除 macOS 并完成 Windows 原生验收
+<!-- trellis-session: v=2 fp=e4c05df3406b70b9 -->
+
+**日期**: 2026-10-06
+**事项**: 移除 macOS 并完成 Windows 原生验收
+**分支**: `codex/remote-debug-p0`
+
+### 概述
+
+产品仅保留 Linux/Windows，修复 Windows 文件身份快照和 Winsock 分类，完成两平台实际服务验收并归档当前 P0；不推送，保留用户文件与旧 GUI 任务。
+
+### 主要变更
+
+- 删除 Darwin GUI/巡检/解析/PTY 分支和 purego 依赖，构建及 CI 收敛四组合。
+- 稳定捕获 Windows 文件与日志路径身份，严格保留替换冲突；按 WSA 常量分类拒绝、不可达和超时。
+- 新增标准库 Go 原生助手与 MCP 部署脚本，Windows 无需 Python，精确清理临时资源并确认原服务仍可用。
+
+### 工作提交
+
+| 提交 | 说明 |
+|------|---------|
+| `d08dc748191f62dbfd644c6c968bac3b18928412` | refactor: 移除 macOS 平台支持 |
+| `22bd07c31a3eab144b3bd431cfae33701dfec10c` | fix: 修正 Windows 文件身份与网络错误分类 |
+| `42aceb4a2f499b9924516af26dbe59467b41f734` | test: 补齐 P0 原生验收与平台契约 |
+
+### 验证
+
+- [OK] 最终全量 go vet、go test、go test -race、四组合双入口无 CGO 构建通过。
+- [OK] Python 48 项和 Go 助手 4 项回归通过；Linux 与 Windows/amd64 各旧功能/P0 两种鉴权四轮闭环通过。
+- [OK] Windows 九包 111 顶层通过、4 跳过；真实 ConPTY EOF/重定向/resize/Ctrl+C/Job 回收通过。
+
+### 状态
+
+[OK] **已完成**
+
+### 后续事项
+
+- Windows arm64 仅构建、Windows race 未原生执行；GUI 原任务保留独立验收缺口，首版与规范引导任务保持原状态。
