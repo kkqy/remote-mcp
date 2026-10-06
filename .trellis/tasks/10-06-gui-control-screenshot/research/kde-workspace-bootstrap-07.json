@@ -1,0 +1,275 @@
+{
+  "readiness": {
+    "stage": "failed",
+    "portal_start_called": false,
+    "clipboard_accessed": false,
+    "components": {
+      "pipewire": {
+        "pid": 2604006,
+        "argv": [
+          "/usr/bin/pipewire"
+        ]
+      },
+      "wireplumber": {
+        "pid": 2604013,
+        "argv": [
+          "/usr/bin/wireplumber"
+        ]
+      },
+      "kscreen": {
+        "pid": 2604014,
+        "argv": [
+          "/usr/lib/kf6/kscreen_backend_launcher"
+        ]
+      },
+      "permission-store": {
+        "pid": 2604046,
+        "argv": [
+          "/usr/lib/xdg-permission-store"
+        ]
+      },
+      "portal-kde": {
+        "pid": 2604055,
+        "argv": [
+          "/usr/lib/xdg-desktop-portal-kde"
+        ]
+      },
+      "portal": {
+        "pid": 2604068,
+        "argv": [
+          "/usr/lib/xdg-desktop-portal"
+        ]
+      },
+      "mcp": {
+        "pid": 2604137,
+        "argv": [
+          "/home/user/projects/remote-mcp/.tmp/remote-mcp-gui-native-current",
+          "--listen",
+          "127.0.0.1:41195",
+          "--gui-authorize-timeout",
+          "2m"
+        ]
+      }
+    },
+    "runner_pid": 2603999,
+    "layout": {
+      "digest": "efdc66df5a933df279bf8aea06a7cc426a838244e2ee61ac07ad90610c38dc97",
+      "geometry": {
+        "Outputs": [
+          {
+            "ID": 1,
+            "Name": "WL-0",
+            "Connected": true,
+            "Enabled": true,
+            "X": 0,
+            "Y": 0,
+            "Width": 2048,
+            "Height": 1280,
+            "Scale": 1,
+            "Rotation": 1,
+            "ModeWidth": 2048,
+            "ModeHeight": 1280,
+            "Clones": [],
+            "ReplicationSource": 0
+          }
+        ],
+        "ScreenWidth": 2048,
+        "ScreenHeight": 1280
+      },
+      "source_sha256": "d4f8959265771b9a386fbab7bb410a9f3db0d2bc98b9d219bb5791ed63eb936f"
+    },
+    "owner_pids": {
+      "org.kde.KScreen": 2604014,
+      "org.freedesktop.impl.portal.PermissionStore": 2604046,
+      "org.freedesktop.impl.portal.desktop.kde": 2604055,
+      "org.freedesktop.portal.Desktop": 2604068,
+      "org.freedesktop.DBus": 2603960
+    },
+    "portal_properties": {
+      "RemoteDesktop": "({'AvailableDeviceTypes': <uint32 7>, 'version': <uint32 2>},)\n",
+      "ScreenCast": "({'AvailableSourceTypes': <uint32 7>, 'AvailableCursorModes': <uint32 7>, 'version': <uint32 5>},)\n",
+      "Screenshot": "({'AvailableTargets': <uint32 0>, 'version': <uint32 2>},)\n",
+      "Clipboard": "({'version': <uint32 1>},)\n"
+    },
+    "binary_sha256": "bb010f9e42c75748bb15479a1d7d3b5518bb9125fd3c8fcff983c5500c5c1bfe",
+    "mcp_url": "http://127.0.0.1:41195/mcp",
+    "gui_status": {
+      "backend": "wayland-portal",
+      "state": "available",
+      "capabilities": {
+        "screenshot": true,
+        "mouse": true,
+        "keyboard": true,
+        "text": true,
+        "direct_text": false,
+        "clipboard": true
+      },
+      "displays": [],
+      "layout_generation": 0
+    },
+    "component_environments": {
+      "pipewire": {
+        "XDG_RUNTIME_DIR": "/home/user/projects/remote-mcp/.tmp/kde-native-g/runtime",
+        "XDG_CONFIG_HOME": "/home/user/projects/remote-mcp/.tmp/kde-native-g/config",
+        "XDG_DATA_HOME": "/home/user/projects/remote-mcp/.tmp/kde-native-g/data",
+        "DBUS_SESSION_BUS_ADDRESS": "unix:path=/home/user/projects/remote-mcp/.tmp/kde-native-g/runtime/bus,guid=a2e61d3032f58ac76fbbac286ac50c22",
+        "WAYLAND_DISPLAY": "gui-native-inner",
+        "PIPEWIRE_RUNTIME_DIR": "/home/user/projects/remote-mcp/.tmp/kde-native-g/runtime",
+        "TMPDIR": "/home/user/projects/remote-mcp/.tmp/kde-native-g/temp",
+        "TMP": "/home/user/projects/remote-mcp/.tmp/kde-native-g/temp",
+        "TEMP": "/home/user/projects/remote-mcp/.tmp/kde-native-g/temp"
+      },
+      "wireplumber": {
+        "XDG_RUNTIME_DIR": "/home/user/projects/remote-mcp/.tmp/kde-native-g/runtime",
+        "XDG_CONFIG_HOME": "/home/user/projects/remote-mcp/.tmp/kde-native-g/config",
+        "XDG_DATA_HOME": "/home/user/projects/remote-mcp/.tmp/kde-native-g/data",
+        "DBUS_SESSION_BUS_ADDRESS": "unix:path=/home/user/projects/remote-mcp/.tmp/kde-native-g/runtime/bus,guid=a2e61d3032f58ac76fbbac286ac50c22",
+        "WAYLAND_DISPLAY": "gui-native-inner",
+        "PIPEWIRE_RUNTIME_DIR": "/home/user/projects/remote-mcp/.tmp/kde-native-g/runtime",
+        "TMPDIR": "/home/user/projects/remote-mcp/.tmp/kde-native-g/temp",
+        "TMP": "/home/user/projects/remote-mcp/.tmp/kde-native-g/temp",
+        "TEMP": "/home/user/projects/remote-mcp/.tmp/kde-native-g/temp"
+      },
+      "kscreen": {
+        "XDG_RUNTIME_DIR": "/home/user/projects/remote-mcp/.tmp/kde-native-g/runtime",
+        "XDG_CONFIG_HOME": "/home/user/projects/remote-mcp/.tmp/kde-native-g/config",
+        "XDG_DATA_HOME": "/home/user/projects/remote-mcp/.tmp/kde-native-g/data",
+        "DBUS_SESSION_BUS_ADDRESS": "unix:path=/home/user/projects/remote-mcp/.tmp/kde-native-g/runtime/bus,guid=a2e61d3032f58ac76fbbac286ac50c22",
+        "WAYLAND_DISPLAY": "gui-native-inner",
+        "PIPEWIRE_RUNTIME_DIR": "/home/user/projects/remote-mcp/.tmp/kde-native-g/runtime",
+        "TMPDIR": "/home/user/projects/remote-mcp/.tmp/kde-native-g/temp",
+        "TMP": "/home/user/projects/remote-mcp/.tmp/kde-native-g/temp",
+        "TEMP": "/home/user/projects/remote-mcp/.tmp/kde-native-g/temp"
+      },
+      "permission-store": {
+        "XDG_RUNTIME_DIR": "/home/user/projects/remote-mcp/.tmp/kde-native-g/runtime",
+        "XDG_CONFIG_HOME": "/home/user/projects/remote-mcp/.tmp/kde-native-g/config",
+        "XDG_DATA_HOME": "/home/user/projects/remote-mcp/.tmp/kde-native-g/data",
+        "DBUS_SESSION_BUS_ADDRESS": "unix:path=/home/user/projects/remote-mcp/.tmp/kde-native-g/runtime/bus,guid=a2e61d3032f58ac76fbbac286ac50c22",
+        "WAYLAND_DISPLAY": "gui-native-inner",
+        "PIPEWIRE_RUNTIME_DIR": "/home/user/projects/remote-mcp/.tmp/kde-native-g/runtime",
+        "TMPDIR": "/home/user/projects/remote-mcp/.tmp/kde-native-g/temp",
+        "TMP": "/home/user/projects/remote-mcp/.tmp/kde-native-g/temp",
+        "TEMP": "/home/user/projects/remote-mcp/.tmp/kde-native-g/temp"
+      },
+      "portal-kde": {
+        "XDG_RUNTIME_DIR": "/home/user/projects/remote-mcp/.tmp/kde-native-g/runtime",
+        "XDG_CONFIG_HOME": "/home/user/projects/remote-mcp/.tmp/kde-native-g/config",
+        "XDG_DATA_HOME": "/home/user/projects/remote-mcp/.tmp/kde-native-g/data",
+        "DBUS_SESSION_BUS_ADDRESS": "unix:path=/home/user/projects/remote-mcp/.tmp/kde-native-g/runtime/bus,guid=a2e61d3032f58ac76fbbac286ac50c22",
+        "WAYLAND_DISPLAY": "gui-native-inner",
+        "PIPEWIRE_RUNTIME_DIR": "/home/user/projects/remote-mcp/.tmp/kde-native-g/runtime",
+        "TMPDIR": "/home/user/projects/remote-mcp/.tmp/kde-native-g/temp",
+        "TMP": "/home/user/projects/remote-mcp/.tmp/kde-native-g/temp",
+        "TEMP": "/home/user/projects/remote-mcp/.tmp/kde-native-g/temp"
+      },
+      "portal": {
+        "XDG_RUNTIME_DIR": "/home/user/projects/remote-mcp/.tmp/kde-native-g/runtime",
+        "XDG_CONFIG_HOME": "/home/user/projects/remote-mcp/.tmp/kde-native-g/config",
+        "XDG_DATA_HOME": "/home/user/projects/remote-mcp/.tmp/kde-native-g/data",
+        "DBUS_SESSION_BUS_ADDRESS": "unix:path=/home/user/projects/remote-mcp/.tmp/kde-native-g/runtime/bus,guid=a2e61d3032f58ac76fbbac286ac50c22",
+        "WAYLAND_DISPLAY": "gui-native-inner",
+        "PIPEWIRE_RUNTIME_DIR": "/home/user/projects/remote-mcp/.tmp/kde-native-g/runtime",
+        "TMPDIR": "/home/user/projects/remote-mcp/.tmp/kde-native-g/temp",
+        "TMP": "/home/user/projects/remote-mcp/.tmp/kde-native-g/temp",
+        "TEMP": "/home/user/projects/remote-mcp/.tmp/kde-native-g/temp"
+      },
+      "mcp": {
+        "XDG_RUNTIME_DIR": "/home/user/projects/remote-mcp/.tmp/kde-native-g/runtime",
+        "XDG_CONFIG_HOME": "/home/user/projects/remote-mcp/.tmp/kde-native-g/config",
+        "XDG_DATA_HOME": "/home/user/projects/remote-mcp/.tmp/kde-native-g/data",
+        "DBUS_SESSION_BUS_ADDRESS": "unix:path=/home/user/projects/remote-mcp/.tmp/kde-native-g/runtime/bus,guid=a2e61d3032f58ac76fbbac286ac50c22",
+        "WAYLAND_DISPLAY": "gui-native-inner",
+        "PIPEWIRE_RUNTIME_DIR": "/home/user/projects/remote-mcp/.tmp/kde-native-g/runtime",
+        "TMPDIR": "/home/user/projects/remote-mcp/.tmp/kde-native-g/temp",
+        "TMP": "/home/user/projects/remote-mcp/.tmp/kde-native-g/temp",
+        "TEMP": "/home/user/projects/remote-mcp/.tmp/kde-native-g/temp"
+      }
+    },
+    "socket_owners": {
+      "bus": 1000,
+      "gui-native-inner": 1000,
+      "pipewire-0": 1000,
+      "pipewire-0-manager": 1000
+    },
+    "unique_owners": {
+      "org.kde.KScreen": "(':1.3',)\n",
+      "org.freedesktop.impl.portal.PermissionStore": "(':1.10',)\n",
+      "org.freedesktop.impl.portal.desktop.kde": "(':1.13',)\n",
+      "org.freedesktop.portal.Desktop": "(':1.16',)\n"
+    },
+    "supervisor_parent_pid": 2603961,
+    "socket_path_bytes": {
+      "bus": 60,
+      "gui-native-inner": 73,
+      "pipewire-0": 67,
+      "pipewire-0-manager": 75
+    },
+    "lease_deadline_unix": 1791300395.1542726,
+    "error": "Private clipboard trace proof is unavailable",
+    "cleanup": {
+      "pipewire": 0,
+      "wireplumber": 0,
+      "kscreen": -15,
+      "permission-store": -15,
+      "portal-kde": -15,
+      "portal": -15,
+      "mcp": 0
+    }
+  },
+  "filtered_portal_trace": {
+    "pid": 2604055,
+    "sender_kind": "portal-kde",
+    "ok": false,
+    "reason": "unknown_protocol",
+    "observed_monotonic": 97295.722781257,
+    "sequence": 0
+  },
+  "root_cleanup": {
+    "held_pids": {
+      "2603959": "not_present",
+      "2603999": "not_present",
+      "2604006": "not_present",
+      "2604013": "not_present",
+      "2604014": "not_present",
+      "2604046": "not_present",
+      "2604055": "not_present",
+      "2604068": "not_present",
+      "2604137": "not_present"
+    },
+    "outer_exit": 0,
+    "checked_at_unix": 1791298648.202611
+  },
+  "provider_started": false,
+  "gui_open_called": false,
+  "gui_input_submitted": false,
+  "clipboard_accessed_by_test": false,
+  "full_trace_saved": false,
+  "reviewed_manifest": {
+    "source": "kde-native-c",
+    "review_gate": "passed",
+    "files": {
+      "start.py": "132cf463b699839dc898e048580b011885ed0534e92d3c5890a5e6aa4f3f0a54",
+      "run-private.py": "352f499595a25b389d8fd439959588744d55ba0e28a7a94716986f90e26b6ed6",
+      "root-live-gate.py": "7fbe7e752caf88bded426baa783bae72439b634b6127773d4712209cafd91d06",
+      "fixed-mime-provider.py": "1fa87253a85ad834180a4619f45d5f79401efc9143788f179d8eaf39dce61d96",
+      "test-provider-offline.py": "7fec0f33ac1fa80d62079cdc4990c289fd5b60849da8c631719eb1f65dc6b5d0",
+      "fixture_frame.py": "e806f8ddfe4eba80df550b138af779426af0ecaf3e74a51c758786a2e6052853",
+      "kscreen_canonical.py": "d75710e58c012e38c9ac875157a19bf223d3359fa09f16e7d96e2c5f62fb51f9",
+      "build-canonical-helper.py": "476d1e36be644eff41ce4d352dc948985f068dc651448976feaced8e6635a978",
+      "kscreen-canonical-helper.go": "f3619c0326804752263d9c611f873539f4e66614a28ffa34c5556e0933af6c8f",
+      "kscreen-canonical-helper": "f6ba9542c006a2956195829944be9939d7f6492cca90bdda95468651cbecca30",
+      "bus.conf": "e4c9ee524d02b66edb683107d80aeda4c43b7b4849f196411716641d92ee9b0f",
+      "client_trace.py": "1170c79a34662feef43f5ab98ca2d2ec0c8e4459b32e1d6c847939fd22db215c",
+      "inner.py": "4fb4b13a3b4411496c02f8a6de78b3ebaebec534f71ea166f1f29e143ae61597",
+      "private-fixture.py": "003263d3b9525248fd5386f969c745114db234daba7272b07168032947986400",
+      "transport-reader.py": "b8968a60a5f9f4ce59380a171cb698cec5321c99218bcb98d6b873b04c8f80da",
+      "segmented-smoke.py": "aa83de37699f5abd207efdedae909c57e4735bd5163694df13fd670eddd95385",
+      "test-client-trace.py": "3d41cd2464facf7ad0be3df96fb468c2eb79ac43f05441b6e714ff7443a69929",
+      "test-trace-reader.py": "044e017d4482b44c4f735a28d19d6e2c3038058fed9ec46149692db5c0687015",
+      "test-preflight.py": "656fcaaf6c5edb80984cb4f7a6c28860440116e54e9dac920f693340f582f16b",
+      "test-offline.py": "259700949b440c84e2e39d7eba558cac6e48d82bd870f89b6f6e35c73c788860",
+      "test-decoder.py": "ce0fc64faeaf61a032171d3c4819e61a056d6bc8f3a1a13005d30f27cd64a105"
+    }
+  }
+}

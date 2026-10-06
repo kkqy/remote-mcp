@@ -1,0 +1,25 @@
+{
+  "acceptance_complete": false,
+  "run_completed": false,
+  "checks": [],
+  "submitted_operations": [],
+  "independent_clipboard": {},
+  "pending": [
+    "Validate Windows, X11, GNOME Wayland, and KDE Wayland separately",
+    "Validate multiple displays, mixed scaling, and layout changes",
+    "Independent readability after every provider exits remains required"
+  ],
+  "provider_pids": [
+    2423496
+  ],
+  "binary_sha256": "bb010f9e42c75748bb15479a1d7d3b5518bb9125fd3c8fcff983c5500c5c1bfe",
+  "runner_pid": 2424769,
+  "fixture_pid": 2424772,
+  "stage": "awaiting_manual_portal_authorization",
+  "gui_id": "99754e971d4adb0e3e1aa87dd85583d6",
+  "failure": "The display layout changed during screenshot preparation",
+  "close_confirmed": true,
+  "fixture_running_during_cleanup": true,
+  "fixture_cleaned": true,
+  "fixture_retained": false
+}

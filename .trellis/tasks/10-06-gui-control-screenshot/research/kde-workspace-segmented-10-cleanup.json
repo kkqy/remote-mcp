@@ -1,0 +1,30 @@
+{
+  "held_pids": {
+    "2697536": "not_present",
+    "2697718": "not_present",
+    "2699318": "not_present",
+    "2703680": "not_present",
+    "2703701": "not_present",
+    "2697741": "not_present",
+    "2697761": "not_present",
+    "2697767": "not_present",
+    "2697822": "not_present",
+    "2697831": "not_present",
+    "2697850": "not_present",
+    "2697949": "not_present"
+  },
+  "checked_at_unix": 1791303519.1587737,
+  "outer_exit": 0,
+  "provider_exit": 0,
+  "runner_exit": 1,
+  "component_cleanup": {
+    "pipewire": 0,
+    "wireplumber": 0,
+    "kscreen": -15,
+    "permission-store": -15,
+    "portal-kde": -15,
+    "portal": -15,
+    "mcp": 0
+  },
+  "scope_changed_to_windows_only": true
+}

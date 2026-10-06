@@ -1,0 +1,8 @@
+{
+  "held_pids_all_exited": true,
+  "explicit_fixed_fixture_terminated": [],
+  "outer_exit_code": 0,
+  "provider_exit_code": 0,
+  "runner_exit_code": 1,
+  "new_clipboard_or_input_operations": false
+}

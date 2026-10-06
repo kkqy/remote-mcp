@@ -1,0 +1,17 @@
+{
+  "cgo_enabled": false,
+  "artifacts": {
+    "dist/linux-amd64/remote-mcp": "dc8d2cf2fb8d3db9dc4cea83ecb647dc43e14e0303f68cb4ff4205acb352b6a7",
+    "dist/linux-amd64/remote-mcp-transfer": "90056ec35784d6471bdd7bee6bf23580716b017b3faf0ac65c8fb8fa8a2f5ddd",
+    "dist/linux-arm64/remote-mcp": "44793cd851a31004261cac34a69c8ca03d39c4112a6a284e46a84d0926ee27e8",
+    "dist/linux-arm64/remote-mcp-transfer": "3595d692720c1ae2ac0c9b186aa3b57c44d85c9ffc6055571e291012e157bd9f",
+    "dist/windows-amd64/remote-mcp-transfer.exe": "a041520e1286d7b6e3be5ad4b1027ada2c4ec41db81fe18d644f3703a43f3a76",
+    "dist/windows-amd64/remote-mcp.exe": "5f8ce38e48936eeaf5cf2d9e484cbc7cf8ae6286160747cf6b7546bb2d7749de",
+    "dist/windows-arm64/remote-mcp-transfer.exe": "767313476a607d5f78632a09d2821c1b5fc30d91a3a681a06b724f2b7093538a",
+    "dist/windows-arm64/remote-mcp.exe": "efbf601f32df34202101468f80f23b50bbe09055787dcb3b33da8c6fbf06c2dc"
+  },
+  "helpers": {
+    ".tmp/native-helper-windows-only-amd64.exe": "13c6646090c5624b8c52fa63b5cc809da6a82ab124caaf4bf9bfb501b4094a05",
+    ".tmp/native-helper-windows-only-arm64.exe": "7b24b6c0a1ddb1d6bf613e0ada544c888c52ea4176dbd003306c8c267f20e329"
+  }
+}

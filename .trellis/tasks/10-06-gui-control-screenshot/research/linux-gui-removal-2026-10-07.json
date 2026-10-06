@@ -1,0 +1,145 @@
+{
+  "ok": true,
+  "service_sha256": "dc8d2cf2fb8d3db9dc4cea83ecb647dc43e14e0303f68cb4ff4205acb352b6a7",
+  "help_has_gui_flags": false,
+  "gui_flag_rejected": true,
+  "rounds": [
+    {
+      "authentication": "token",
+      "tools": 33,
+      "gui_registered": false,
+      "removed_calls": [
+        {
+          "tool": "gui_close",
+          "code": -32602,
+          "message": "unknown tool \"gui_close\""
+        },
+        {
+          "tool": "gui_key",
+          "code": -32602,
+          "message": "unknown tool \"gui_key\""
+        },
+        {
+          "tool": "gui_mouse",
+          "code": -32602,
+          "message": "unknown tool \"gui_mouse\""
+        },
+        {
+          "tool": "gui_open",
+          "code": -32602,
+          "message": "unknown tool \"gui_open\""
+        },
+        {
+          "tool": "gui_screenshot",
+          "code": -32602,
+          "message": "unknown tool \"gui_screenshot\""
+        },
+        {
+          "tool": "gui_status",
+          "code": -32602,
+          "message": "unknown tool \"gui_status\""
+        },
+        {
+          "tool": "gui_text",
+          "code": -32602,
+          "message": "unknown tool \"gui_text\""
+        }
+      ]
+    },
+    {
+      "authentication": "anonymous",
+      "tools": 33,
+      "gui_registered": false,
+      "removed_calls": [
+        {
+          "tool": "gui_close",
+          "code": -32602,
+          "message": "unknown tool \"gui_close\""
+        },
+        {
+          "tool": "gui_key",
+          "code": -32602,
+          "message": "unknown tool \"gui_key\""
+        },
+        {
+          "tool": "gui_mouse",
+          "code": -32602,
+          "message": "unknown tool \"gui_mouse\""
+        },
+        {
+          "tool": "gui_open",
+          "code": -32602,
+          "message": "unknown tool \"gui_open\""
+        },
+        {
+          "tool": "gui_screenshot",
+          "code": -32602,
+          "message": "unknown tool \"gui_screenshot\""
+        },
+        {
+          "tool": "gui_status",
+          "code": -32602,
+          "message": "unknown tool \"gui_status\""
+        },
+        {
+          "tool": "gui_text",
+          "code": -32602,
+          "message": "unknown tool \"gui_text\""
+        }
+      ]
+    }
+  ],
+  "legacy_rounds": [
+    {
+      "authentication": "token",
+      "ok": true,
+      "upload_execute_download": true
+    },
+    {
+      "authentication": "anonymous",
+      "ok": true,
+      "upload_execute_download": true
+    }
+  ],
+  "p0_rounds": [
+    {
+      "ok": true,
+      "inspection": true,
+      "waiting_reads": true,
+      "log_rotation": true,
+      "hash_patch": true,
+      "gui_exercised": false,
+      "token_enabled": true,
+      "log_truncation": true,
+      "waiting_timeout": true,
+      "waiting_exit": true,
+      "platform": "linux",
+      "arch": "amd64",
+      "host_platform": "linux",
+      "host_arch": "x86_64",
+      "authentication": "token",
+      "protocol_version": "2025-11-25",
+      "service_shutdown": "graceful"
+    },
+    {
+      "ok": true,
+      "inspection": true,
+      "waiting_reads": true,
+      "log_rotation": true,
+      "hash_patch": true,
+      "gui_exercised": false,
+      "token_enabled": false,
+      "log_truncation": true,
+      "waiting_timeout": true,
+      "waiting_exit": true,
+      "platform": "linux",
+      "arch": "amd64",
+      "host_platform": "linux",
+      "host_arch": "x86_64",
+      "authentication": "anonymous",
+      "protocol_version": "2025-11-25",
+      "service_shutdown": "graceful"
+    }
+  ],
+  "windows_native_current_build": true
+}

@@ -1,8 +1,8 @@
 {
   "id": "gui-control-screenshot",
   "name": "gui-control-screenshot",
-  "title": "GUI 图形操作与截图能力",
-  "description": "为有图形桌面的远程操作系统增加 MCP 图形交互与截图能力",
+  "title": "Windows GUI 图形操作与截图能力",
+  "description": "仅Windows提供GUI截图及键鼠/文字操作；Linux保留命令行远程调试工具",
   "status": "in_progress",
   "dev_type": null,
   "scope": null,
@@ -12,7 +12,7 @@
   "assignee": "kkqy",
   "createdAt": "2026-10-06",
   "completedAt": null,
-  "branch": "codex/gui-control-screenshot",
+  "branch": "codex/gui-native-validation",
   "base_branch": "main",
   "worktree_path": null,
   "commit": null,
@@ -21,6 +21,6 @@
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "GUI 七工具及五类桌面后端已实施；全包 test、race、vet 和六组合无 CGO 构建通过，旧二进制 Token/匿名回归通过。KDE Wayland 第八轮真实 PNG、160% 缩放坐标、鼠标与组合键子集通过。第六轮中文输入后的完整剪贴板恢复失败已修复自动回归，但真实正常恢复仍待验收；其他原生桌面、多屏与授权边界保留待验收，任务不归档。",
+  "notes": "2026-10-07用户明确取消Linux全部GUI，仅保留Windows。代码/CLI/工具发现/依赖/脚本/README/当前规范已同步。全Go test/vet/race、四组合八产物和Windows测试交叉编译通过，复审机械修复后的相关检查49 Python/局部race/vet通过。最终Linux实际旧功能/P0 Token匿名四轮、33工具无GUI/七调用英文unknown_tool/CLI边界通过；最终Windows/amd64当前二进制和子env .tmp版专用窗口Token匿名两轮通过，截图坐标/真实事件/中文emoji/关闭清理/原8080保持通过。KDE j持有12 PID全退出。Windows/arm64实机、多屏混合DPI、布局变化、撤权及客户端图片展示仍未验。等待Phase3.4当前批次提交确认，用户.opencode/package.json不动，未提交或推送。",
   "meta": {}
 }

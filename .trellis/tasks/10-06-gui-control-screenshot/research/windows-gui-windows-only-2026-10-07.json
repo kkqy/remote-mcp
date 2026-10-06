@@ -1,0 +1,86 @@
+{
+  "acceptance_complete": false,
+  "arch": "amd64",
+  "artifacts": {
+    "helper_sha256": "13c6646090c5624b8c52fa63b5cc809da6a82ab124caaf4bf9bfb501b4094a05",
+    "server_sha256": "5f8ce38e48936eeaf5cf2d9e484cbc7cf8ae6286160747cf6b7546bb2d7749de"
+  },
+  "clipboard_accessed": false,
+  "gui_exercised": true,
+  "ok": true,
+  "pending": [
+    "multiple_displays_and_mixed_scaling",
+    "layout_changes",
+    "permission_revocation",
+    "MCP_client_image_display"
+  ],
+  "platform": "windows",
+  "protocol_version": "2025-11-25",
+  "rounds": [
+    {
+      "authentication": "token",
+      "evidence": {
+        "backspaces": 1,
+        "clicks": 3,
+        "clipboard_accessed": false,
+        "coordinate_events_verified": true,
+        "display_count": 1,
+        "double_clicks": 1,
+        "drags": 1,
+        "foreground_guard": true,
+        "height": 441,
+        "horizontal_scroll": 2,
+        "markers_verified": true,
+        "png_after_sha256": "726a457b83f72c4cd26e39ae2d81bf3abbfdd99a3be692543a8d956f629fc34c",
+        "png_before_sha256": "68edf9d1ae4d2a40d4e961dc3463e0f6a8f385cc06b1ac1ac5dd922e6bf1b75a",
+        "region_verified": true,
+        "repeated_close": true,
+        "select_all": 1,
+        "utf8_text_verified": true,
+        "vertical_scroll": -2,
+        "width": 664,
+        "window_cleaned": true
+      },
+      "ok": true,
+      "service_shutdown": "terminate_process",
+      "suite": "gui"
+    },
+    {
+      "authentication": "anonymous",
+      "evidence": {
+        "backspaces": 1,
+        "clicks": 3,
+        "clipboard_accessed": false,
+        "coordinate_events_verified": true,
+        "display_count": 1,
+        "double_clicks": 1,
+        "drags": 1,
+        "foreground_guard": true,
+        "height": 441,
+        "horizontal_scroll": 2,
+        "markers_verified": true,
+        "png_after_sha256": "726a457b83f72c4cd26e39ae2d81bf3abbfdd99a3be692543a8d956f629fc34c",
+        "png_before_sha256": "68edf9d1ae4d2a40d4e961dc3463e0f6a8f385cc06b1ac1ac5dd922e6bf1b75a",
+        "region_verified": true,
+        "repeated_close": true,
+        "select_all": 1,
+        "utf8_text_verified": true,
+        "vertical_scroll": -2,
+        "width": 664,
+        "window_cleaned": true
+      },
+      "ok": true,
+      "service_shutdown": "terminate_process",
+      "suite": "gui"
+    }
+  ],
+  "package_tests": [],
+  "deployment_cleaned": true,
+  "server_sha256": "5f8ce38e48936eeaf5cf2d9e484cbc7cf8ae6286160747cf6b7546bb2d7749de",
+  "helper_sha256": "13c6646090c5624b8c52fa63b5cc809da6a82ab124caaf4bf9bfb501b4094a05",
+  "existing_service_preserved": true,
+  "python_smoke_executed": false,
+  "deployment_temporary_location": "service_working_directory/.tmp",
+  "child_temp_environment": "owned_deployment_directory",
+  "windows_arm64_native_verified": false
+}

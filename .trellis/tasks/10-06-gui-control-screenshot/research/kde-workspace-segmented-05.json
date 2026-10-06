@@ -1,0 +1,227 @@
+{
+  "acceptance_complete": false,
+  "run_completed": false,
+  "checks": [],
+  "submitted_operations": [
+    {
+      "tool": "gui_mouse",
+      "phase": "initial-native-click",
+      "submitted": true,
+      "native_events_verified": true
+    }
+  ],
+  "independent_clipboard": {
+    "before-refresh": {
+      "ok": true,
+      "reason": "independent_transport_read_completed",
+      "summary": {
+        "formats": [
+          {
+            "mime": "application/x-remote-mcp-native-baseline",
+            "length": 20,
+            "sha256": "787ad58f646774fbd16b850b2c8366a49fe82d61267f96cc90846af09a85ce24"
+          },
+          {
+            "mime": "text/html",
+            "length": 43,
+            "sha256": "841c62b67884b6cfa5e4d33ecba0ad20d4bfb71e97ddb4eaf6671fbcd6b745ca"
+          },
+          {
+            "mime": "text/plain",
+            "length": 32,
+            "sha256": "cb341b10cce702fc7f705a5c7326ee4cda9f550ba222fea1e36e9626e017459c"
+          }
+        ],
+        "total_bytes": 95
+      },
+      "native_click_verified": true,
+      "data_changed_count": 1,
+      "owns_clipboard": false,
+      "platform": "wayland",
+      "samples": [
+        {
+          "elapsed_ms": 2097,
+          "revision": 1,
+          "format_count": 3,
+          "total_bytes": 95
+        },
+        {
+          "elapsed_ms": 2359,
+          "revision": 1,
+          "format_count": 3,
+          "total_bytes": 95
+        },
+        {
+          "elapsed_ms": 2621,
+          "revision": 1,
+          "format_count": 3,
+          "total_bytes": 95
+        },
+        {
+          "elapsed_ms": 2874,
+          "revision": 1,
+          "format_count": 3,
+          "total_bytes": 95
+        },
+        {
+          "elapsed_ms": 3124,
+          "revision": 1,
+          "format_count": 3,
+          "total_bytes": 95
+        },
+        {
+          "elapsed_ms": 3374,
+          "revision": 1,
+          "format_count": 3,
+          "total_bytes": 95
+        },
+        {
+          "elapsed_ms": 3624,
+          "revision": 1,
+          "format_count": 3,
+          "total_bytes": 95
+        },
+        {
+          "elapsed_ms": 3874,
+          "revision": 1,
+          "format_count": 3,
+          "total_bytes": 95
+        },
+        {
+          "elapsed_ms": 4124,
+          "revision": 1,
+          "format_count": 3,
+          "total_bytes": 95
+        }
+      ],
+      "clipboard_written": false,
+      "touches_primary": false
+    },
+    "after-gui-close": {
+      "ok": true,
+      "reason": "independent_transport_read_completed",
+      "summary": {
+        "formats": [
+          {
+            "mime": "application/x-remote-mcp-native-baseline",
+            "length": 20,
+            "sha256": "787ad58f646774fbd16b850b2c8366a49fe82d61267f96cc90846af09a85ce24"
+          },
+          {
+            "mime": "text/html",
+            "length": 43,
+            "sha256": "841c62b67884b6cfa5e4d33ecba0ad20d4bfb71e97ddb4eaf6671fbcd6b745ca"
+          },
+          {
+            "mime": "text/plain",
+            "length": 32,
+            "sha256": "cb341b10cce702fc7f705a5c7326ee4cda9f550ba222fea1e36e9626e017459c"
+          }
+        ],
+        "total_bytes": 95
+      },
+      "native_click_verified": true,
+      "data_changed_count": 1,
+      "owns_clipboard": false,
+      "platform": "wayland",
+      "samples": [
+        {
+          "elapsed_ms": 17030,
+          "revision": 1,
+          "format_count": 3,
+          "total_bytes": 95
+        },
+        {
+          "elapsed_ms": 17280,
+          "revision": 1,
+          "format_count": 3,
+          "total_bytes": 95
+        },
+        {
+          "elapsed_ms": 17530,
+          "revision": 1,
+          "format_count": 3,
+          "total_bytes": 95
+        },
+        {
+          "elapsed_ms": 17780,
+          "revision": 1,
+          "format_count": 3,
+          "total_bytes": 95
+        },
+        {
+          "elapsed_ms": 18030,
+          "revision": 1,
+          "format_count": 3,
+          "total_bytes": 95
+        },
+        {
+          "elapsed_ms": 18280,
+          "revision": 1,
+          "format_count": 3,
+          "total_bytes": 95
+        },
+        {
+          "elapsed_ms": 18530,
+          "revision": 1,
+          "format_count": 3,
+          "total_bytes": 95
+        },
+        {
+          "elapsed_ms": 18780,
+          "revision": 1,
+          "format_count": 3,
+          "total_bytes": 95
+        },
+        {
+          "elapsed_ms": 19029,
+          "revision": 1,
+          "format_count": 3,
+          "total_bytes": 95
+        },
+        {
+          "elapsed_ms": 19279,
+          "revision": 1,
+          "format_count": 3,
+          "total_bytes": 95
+        }
+      ],
+      "clipboard_written": false,
+      "touches_primary": false
+    }
+  },
+  "pending": [
+    "Validate Windows, X11, GNOME Wayland, and KDE Wayland separately",
+    "Validate multiple displays, mixed scaling, and layout changes",
+    "Independent readability after every provider exits remains required"
+  ],
+  "provider_pids": [
+    2479574
+  ],
+  "binary_sha256": "bb010f9e42c75748bb15479a1d7d3b5518bb9125fd3c8fcff983c5500c5c1bfe",
+  "runner_pid": 2479980,
+  "fixture_pid": 2480023,
+  "stage": "manual_reader_click",
+  "gui_id": "8b33e88c7724fe8cef5afde96125c0e8",
+  "screenshot_preparation": {
+    "initial-native-click": {
+      "target": "fixture",
+      "attempts": 1,
+      "exact_markers": true,
+      "target_signature": true,
+      "first_pixel_materialization": true
+    },
+    "reader-before-refresh": {
+      "target": "reader",
+      "attempts": 1,
+      "exact_markers": true,
+      "target_signature": true,
+      "first_pixel_materialization": false
+    }
+  },
+  "failure": "Screenshot preparation deadline expired",
+  "close_confirmed": true,
+  "fixture_running_during_cleanup": true,
+  "fixture_cleaned": true,
+  "fixture_retained": false
+}

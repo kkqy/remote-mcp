@@ -1,0 +1,421 @@
+{
+  "report": {
+    "acceptance_complete": false,
+    "run_completed": false,
+    "checks": [],
+    "submitted_operations": [
+      {
+        "tool": "gui_mouse",
+        "phase": "initial-native-click",
+        "submitted": true,
+        "native_events_verified": true
+      }
+    ],
+    "independent_clipboard": {
+      "before-refresh": {
+        "pid": 2659587,
+        "ok": true,
+        "reason": "independent_raw_transport_read_completed",
+        "summary": {
+          "formats": [
+            {
+              "mime": "application/x-remote-mcp-native-baseline",
+              "length": 20,
+              "sha256": "787ad58f646774fbd16b850b2c8366a49fe82d61267f96cc90846af09a85ce24"
+            },
+            {
+              "mime": "text/html",
+              "length": 43,
+              "sha256": "841c62b67884b6cfa5e4d33ecba0ad20d4bfb71e97ddb4eaf6671fbcd6b745ca"
+            },
+            {
+              "mime": "text/plain",
+              "length": 32,
+              "sha256": "cb341b10cce702fc7f705a5c7326ee4cda9f550ba222fea1e36e9626e017459c"
+            },
+            {
+              "mime": "text/plain;charset=utf-8",
+              "length": 32,
+              "sha256": "cb341b10cce702fc7f705a5c7326ee4cda9f550ba222fea1e36e9626e017459c"
+            }
+          ],
+          "total_bytes": 127
+        },
+        "raw_summary": {
+          "formats": [
+            {
+              "mime": "application/x-remote-mcp-native-baseline",
+              "length": 20,
+              "sha256": "787ad58f646774fbd16b850b2c8366a49fe82d61267f96cc90846af09a85ce24"
+            },
+            {
+              "mime": "text/html",
+              "length": 43,
+              "sha256": "841c62b67884b6cfa5e4d33ecba0ad20d4bfb71e97ddb4eaf6671fbcd6b745ca"
+            },
+            {
+              "mime": "text/plain",
+              "length": 32,
+              "sha256": "cb341b10cce702fc7f705a5c7326ee4cda9f550ba222fea1e36e9626e017459c"
+            },
+            {
+              "mime": "text/plain;charset=utf-8",
+              "length": 32,
+              "sha256": "cb341b10cce702fc7f705a5c7326ee4cda9f550ba222fea1e36e9626e017459c"
+            }
+          ],
+          "total_bytes": 127
+        },
+        "raw_offer": {
+          "object": "wl_data_offer:4278190080",
+          "token": 2,
+          "protocol": "wl",
+          "mimes": [
+            "application/x-remote-mcp-native-baseline",
+            "text/html",
+            "text/plain",
+            "text/plain;charset=utf-8"
+          ]
+        },
+        "qt_normalized_summary": {
+          "formats": [
+            {
+              "mime": "application/x-remote-mcp-native-baseline",
+              "length": 20,
+              "sha256": "787ad58f646774fbd16b850b2c8366a49fe82d61267f96cc90846af09a85ce24"
+            },
+            {
+              "mime": "text/html",
+              "length": 43,
+              "sha256": "841c62b67884b6cfa5e4d33ecba0ad20d4bfb71e97ddb4eaf6671fbcd6b745ca"
+            },
+            {
+              "mime": "text/plain",
+              "length": 32,
+              "sha256": "cb341b10cce702fc7f705a5c7326ee4cda9f550ba222fea1e36e9626e017459c"
+            }
+          ],
+          "total_bytes": 95
+        },
+        "raw_receive_policy": "one_observed_receive_per_raw_mime",
+        "cache_reused_for_normalized_view": true,
+        "raw_read_resolution": {
+          "raw_mime_receive_counts": {
+            "application/x-remote-mcp-native-baseline": 1,
+            "text/html": 1,
+            "text/plain": 1,
+            "text/plain;charset=utf-8": 1
+          },
+          "canonical_plain_source": "text/plain",
+          "canonical_plain_resolution": "exact_raw_then_normalized_cache",
+          "fd_identity_proven": false
+        },
+        "native_click_verified": true,
+        "data_changed_count": 1,
+        "owns_clipboard": false,
+        "platform": "wayland",
+        "samples": [
+          {
+            "elapsed_ms": 526,
+            "revision": 1,
+            "format_count": 4,
+            "total_bytes": 127
+          },
+          {
+            "elapsed_ms": 788,
+            "revision": 1,
+            "format_count": 4,
+            "total_bytes": 127
+          },
+          {
+            "elapsed_ms": 1050,
+            "revision": 1,
+            "format_count": 4,
+            "total_bytes": 127
+          },
+          {
+            "elapsed_ms": 1311,
+            "revision": 1,
+            "format_count": 4,
+            "total_bytes": 127
+          },
+          {
+            "elapsed_ms": 1573,
+            "revision": 1,
+            "format_count": 4,
+            "total_bytes": 127
+          },
+          {
+            "elapsed_ms": 1836,
+            "revision": 1,
+            "format_count": 4,
+            "total_bytes": 127
+          },
+          {
+            "elapsed_ms": 2097,
+            "revision": 1,
+            "format_count": 4,
+            "total_bytes": 127
+          },
+          {
+            "elapsed_ms": 2359,
+            "revision": 1,
+            "format_count": 4,
+            "total_bytes": 127
+          },
+          {
+            "elapsed_ms": 2609,
+            "revision": 1,
+            "format_count": 4,
+            "total_bytes": 127
+          }
+        ],
+        "clipboard_written": false,
+        "touches_primary": false
+      },
+      "after-gui-close": {
+        "pid": 2659668,
+        "ok": true,
+        "reason": "independent_raw_transport_read_completed",
+        "summary": {
+          "formats": [
+            {
+              "mime": "application/x-remote-mcp-native-baseline",
+              "length": 20,
+              "sha256": "787ad58f646774fbd16b850b2c8366a49fe82d61267f96cc90846af09a85ce24"
+            },
+            {
+              "mime": "text/html",
+              "length": 43,
+              "sha256": "841c62b67884b6cfa5e4d33ecba0ad20d4bfb71e97ddb4eaf6671fbcd6b745ca"
+            },
+            {
+              "mime": "text/plain",
+              "length": 32,
+              "sha256": "cb341b10cce702fc7f705a5c7326ee4cda9f550ba222fea1e36e9626e017459c"
+            },
+            {
+              "mime": "text/plain;charset=utf-8",
+              "length": 32,
+              "sha256": "cb341b10cce702fc7f705a5c7326ee4cda9f550ba222fea1e36e9626e017459c"
+            }
+          ],
+          "total_bytes": 127
+        },
+        "raw_summary": {
+          "formats": [
+            {
+              "mime": "application/x-remote-mcp-native-baseline",
+              "length": 20,
+              "sha256": "787ad58f646774fbd16b850b2c8366a49fe82d61267f96cc90846af09a85ce24"
+            },
+            {
+              "mime": "text/html",
+              "length": 43,
+              "sha256": "841c62b67884b6cfa5e4d33ecba0ad20d4bfb71e97ddb4eaf6671fbcd6b745ca"
+            },
+            {
+              "mime": "text/plain",
+              "length": 32,
+              "sha256": "cb341b10cce702fc7f705a5c7326ee4cda9f550ba222fea1e36e9626e017459c"
+            },
+            {
+              "mime": "text/plain;charset=utf-8",
+              "length": 32,
+              "sha256": "cb341b10cce702fc7f705a5c7326ee4cda9f550ba222fea1e36e9626e017459c"
+            }
+          ],
+          "total_bytes": 127
+        },
+        "raw_offer": {
+          "object": "wl_data_offer:4278190080",
+          "token": 2,
+          "protocol": "wl",
+          "mimes": [
+            "application/x-remote-mcp-native-baseline",
+            "text/html",
+            "text/plain",
+            "text/plain;charset=utf-8"
+          ]
+        },
+        "qt_normalized_summary": {
+          "formats": [
+            {
+              "mime": "application/x-remote-mcp-native-baseline",
+              "length": 20,
+              "sha256": "787ad58f646774fbd16b850b2c8366a49fe82d61267f96cc90846af09a85ce24"
+            },
+            {
+              "mime": "text/html",
+              "length": 43,
+              "sha256": "841c62b67884b6cfa5e4d33ecba0ad20d4bfb71e97ddb4eaf6671fbcd6b745ca"
+            },
+            {
+              "mime": "text/plain",
+              "length": 32,
+              "sha256": "cb341b10cce702fc7f705a5c7326ee4cda9f550ba222fea1e36e9626e017459c"
+            }
+          ],
+          "total_bytes": 95
+        },
+        "raw_receive_policy": "one_observed_receive_per_raw_mime",
+        "cache_reused_for_normalized_view": true,
+        "raw_read_resolution": {
+          "raw_mime_receive_counts": {
+            "application/x-remote-mcp-native-baseline": 1,
+            "text/html": 1,
+            "text/plain": 1,
+            "text/plain;charset=utf-8": 1
+          },
+          "canonical_plain_source": "text/plain",
+          "canonical_plain_resolution": "exact_raw_then_normalized_cache",
+          "fd_identity_proven": false
+        },
+        "native_click_verified": true,
+        "data_changed_count": 1,
+        "owns_clipboard": false,
+        "platform": "wayland",
+        "samples": [
+          {
+            "elapsed_ms": 32669,
+            "revision": 1,
+            "format_count": 4,
+            "total_bytes": 127
+          },
+          {
+            "elapsed_ms": 32919,
+            "revision": 1,
+            "format_count": 4,
+            "total_bytes": 127
+          },
+          {
+            "elapsed_ms": 33169,
+            "revision": 1,
+            "format_count": 4,
+            "total_bytes": 127
+          },
+          {
+            "elapsed_ms": 33419,
+            "revision": 1,
+            "format_count": 4,
+            "total_bytes": 127
+          },
+          {
+            "elapsed_ms": 33669,
+            "revision": 1,
+            "format_count": 4,
+            "total_bytes": 127
+          },
+          {
+            "elapsed_ms": 33918,
+            "revision": 1,
+            "format_count": 4,
+            "total_bytes": 127
+          },
+          {
+            "elapsed_ms": 34169,
+            "revision": 1,
+            "format_count": 4,
+            "total_bytes": 127
+          },
+          {
+            "elapsed_ms": 34418,
+            "revision": 1,
+            "format_count": 4,
+            "total_bytes": 127
+          },
+          {
+            "elapsed_ms": 34668,
+            "revision": 1,
+            "format_count": 4,
+            "total_bytes": 127
+          },
+          {
+            "elapsed_ms": 34919,
+            "revision": 1,
+            "format_count": 4,
+            "total_bytes": 127
+          }
+        ],
+        "clipboard_written": false,
+        "touches_primary": false
+      }
+    },
+    "pending": [
+      "Validate Windows, X11, GNOME Wayland, and KDE Wayland separately",
+      "Validate multiple displays, mixed scaling, and layout changes",
+      "Independent readability after every provider exits remains required"
+    ],
+    "provider_pids": [
+      2653072
+    ],
+    "binary_sha256": "bb010f9e42c75748bb15479a1d7d3b5518bb9125fd3c8fcff983c5500c5c1bfe",
+    "runner_pid": 2658662,
+    "fixture_pid": 2658677,
+    "stage": "manual_reader_click",
+    "gui_id": "c067bd124200a6527b9d6c2f9470e088",
+    "screenshot_preparation": {
+      "initial-native-click": {
+        "target": "fixture",
+        "attempts": 1,
+        "exact_markers": true,
+        "target_signature": true,
+        "first_pixel_materialization": true
+      },
+      "reader-before-refresh": {
+        "target": "reader",
+        "attempts": 1,
+        "exact_markers": true,
+        "target_signature": true,
+        "first_pixel_materialization": false
+      }
+    },
+    "failure": "A unique selected raw clipboard offer is unconfirmed",
+    "close_confirmed": true,
+    "fixture_running_during_cleanup": true,
+    "independent_close_failure": "Independent readability after GUI close was not confirmed",
+    "fixture_cleaned": true,
+    "fixture_retained": false
+  },
+  "root_summary_check": {
+    "raw_mime_count": 4,
+    "raw_bytes": 127,
+    "original_mime_count": 3,
+    "original_bytes": 95,
+    "independent_phases": [
+      "before-refresh",
+      "after-gui-close"
+    ],
+    "hashes_match": true,
+    "protocol_source_gate_passed": false,
+    "refresh_attempted": false,
+    "text_or_key_submitted": false
+  },
+  "reviewed_manifest": {
+    "source": "kde-native-h",
+    "review_gate": "passed",
+    "files": {
+      "start.py": "132cf463b699839dc898e048580b011885ed0534e92d3c5890a5e6aa4f3f0a54",
+      "inner.py": "4fb4b13a3b4411496c02f8a6de78b3ebaebec534f71ea166f1f29e143ae61597",
+      "run-private.py": "352f499595a25b389d8fd439959588744d55ba0e28a7a94716986f90e26b6ed6",
+      "root-live-gate.py": "7fbe7e752caf88bded426baa783bae72439b634b6127773d4712209cafd91d06",
+      "fixed-mime-provider.py": "1fa87253a85ad834180a4619f45d5f79401efc9143788f179d8eaf39dce61d96",
+      "test-provider-offline.py": "7fec0f33ac1fa80d62079cdc4990c289fd5b60849da8c631719eb1f65dc6b5d0",
+      "fixture_frame.py": "e806f8ddfe4eba80df550b138af779426af0ecaf3e74a51c758786a2e6052853",
+      "private-fixture.py": "003263d3b9525248fd5386f969c745114db234daba7272b07168032947986400",
+      "transport-reader.py": "b8968a60a5f9f4ce59380a171cb698cec5321c99218bcb98d6b873b04c8f80da",
+      "segmented-smoke.py": "aa83de37699f5abd207efdedae909c57e4735bd5163694df13fd670eddd95385",
+      "test-trace-reader.py": "044e017d4482b44c4f735a28d19d6e2c3038058fed9ec46149692db5c0687015",
+      "test-preflight.py": "656fcaaf6c5edb80984cb4f7a6c28860440116e54e9dac920f693340f582f16b",
+      "test-offline.py": "259700949b440c84e2e39d7eba558cac6e48d82bd870f89b6f6e35c73c788860",
+      "test-decoder.py": "ce0fc64faeaf61a032171d3c4819e61a056d6bc8f3a1a13005d30f27cd64a105",
+      "kscreen_canonical.py": "d75710e58c012e38c9ac875157a19bf223d3359fa09f16e7d96e2c5f62fb51f9",
+      "build-canonical-helper.py": "476d1e36be644eff41ce4d352dc948985f068dc651448976feaced8e6635a978",
+      "kscreen-canonical-helper.go": "f3619c0326804752263d9c611f873539f4e66614a28ffa34c5556e0933af6c8f",
+      "kscreen-canonical-helper": "f6ba9542c006a2956195829944be9939d7f6492cca90bdda95468651cbecca30",
+      "client_trace.py": "81a5a68878525d50c1e27f2276dbe8ef3b0b86589b93f321f291175c66cae2ba",
+      "test-client-trace.py": "21bdd176a16647383e58780d9337ce0d33e2f33a06c2e373b1c95b3359ca9003",
+      "bus.conf": "fefc12bfc45f057998f4c9dfe49469061ab5b3eb82b325f954cc33bb2a8d6961"
+    }
+  }
+}
