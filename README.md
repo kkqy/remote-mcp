@@ -4,20 +4,20 @@
 
 A Go MCP service deployed on a remote machine. Agents connect over a local network or VPN to transfer files, run commands, and operate real interactive terminals. The service includes two programs: the `remote-mcp` server and the `remote-mcp-transfer` local file transfer helper.
 
-## 下载与自动发布
+## Downloads and automated releases
 
-可从仓库的 [GitHub Releases](../../releases) 下载正式版本。每个压缩包只含 `remote-mcp` 服务端和 `remote-mcp-transfer` 辅助命令；Windows 文件带 `.exe` 后缀。
+Download official versions from [GitHub Releases](../../releases). Each archive contains only the `remote-mcp` server and the `remote-mcp-transfer` helper; Windows filenames end in `.exe`.
 
-| 平台 | 附件名（以 `v1.2.3` 为例） |
+| Platform | Asset name (using `v1.2.3` as an example) |
 | --- | --- |
 | Linux amd64 | `remote-mcp-v1.2.3-linux-amd64.tar.gz` |
 | Linux arm64 | `remote-mcp-v1.2.3-linux-arm64.tar.gz` |
 | Windows amd64 | `remote-mcp-v1.2.3-windows-amd64.zip` |
 | Windows arm64 | `remote-mcp-v1.2.3-windows-arm64.zip` |
 
-同一版本附带 `SHA256SUMS`，记录四个压缩包的实际 SHA-256。Linux 下载全部附件后可运行 `sha256sum -c SHA256SUMS`，再用 `tar -xzf <压缩包>` 解压；tar 保留两个程序的可执行权限。Windows 解压 zip 后运行 `.exe`，可用 `Get-FileHash <压缩包> -Algorithm SHA256` 对照校验文件。
+Each release includes `SHA256SUMS` with the SHA-256 hashes of the four archives. On Linux, download all assets, run `sha256sum -c SHA256SUMS`, then extract with `tar -xzf <archive>`; tar preserves the executable permissions of both programs. On Windows, extract the zip and run the `.exe` files. Use `Get-FileHash <archive> -Algorithm SHA256` to compare each hash with the manifest.
 
-维护者先将发布工作流和版本代码合入并推送 `main`，再从已合入 `main` 的提交创建并推送标签，例如：
+Maintainers should first merge and push the release workflow and version code to `main`, then create and push a tag from a commit already merged into `main`, for example:
 
 ```sh
 git switch main
@@ -26,13 +26,13 @@ git tag -a v1.2.3 -m "Release v1.2.3"
 git push origin v1.2.3
 ```
 
-内置 `GITHUB_TOKEN` 不具备额外的 Workflows 权限；标签目标若包含相对默认分支尚未合入的工作流修改，GitHub 可能拒绝创建 Release。本流程不使用 PAT，请先完成上述合入步骤。
+The built-in `GITHUB_TOKEN` has no additional Workflows permission. GitHub may reject release creation if the tagged commit changes workflows that have not yet been merged into the default branch. This process uses no PAT; complete the merge above first.
 
-普通分支 push 和 PR 继续验证，不发布版本；仅 `v*` 标签 push 进入发布流程。打包脚本要求标签以 `v` 开头、后续首字符为字母或数字、其余仅含字母/数字/点/下划线/连字符，总长最多 64 字符；其他名称会明确失败。Linux、Windows 原生验证和四组合构建全部成功后，发布 job 才创建草稿、上传四个包和校验文件，全部上传成功后公开为正式 Release。只有该 job 的 `GITHUB_TOKEN` 具有 `contents: write`，相同 ref 的发布串行且不取消正在执行的发布；原有二进制和 P0 验证 artifact 保留。
+Branch pushes and pull requests continue to run validation without publishing a release; only `v*` tag pushes enter the release flow. The packaging script requires a tag starting with `v`, followed by a letter or digit, then only letters, digits, dots, underscores or hyphens, with a maximum total length of 64 characters. Other names fail explicitly. The release job creates a draft and uploads the four archives and checksum file only after native Linux and Windows validation and all four build combinations succeed. It publishes the release only after every upload succeeds. Only this job has `contents: write` through `GITHUB_TOKEN`. Releases for the same ref run serially without cancelling an active publication; existing binary and P0 validation artifacts are retained.
 
-已有正式 Release 或同标签草稿不会自动覆盖。验证阶段失败时可在 Actions 重跑；若创建草稿或上传中断，先在 Releases 核对本次标签与草稿附件，再手动删除**本次失败草稿**，保留标签并重跑该 Actions run。不要删除已公开版本或使用附件覆盖参数。最终公开请求若超时，结果可能已生效，必须先查看 Release 状态；若已公开则不重跑覆盖，后续修改使用新版本标签。
+An existing published release or draft for the same tag is never automatically overwritten. Rerun validation failures in Actions. If draft creation or upload is interrupted, inspect the tag and draft assets in Releases, manually delete **only that failed draft**, keep the tag, and rerun the Actions run. Do not delete a published release or use asset overwrite options. A final publication request that times out may already have succeeded: check the release state first. If it is published, use a new version tag for subsequent changes instead of rerunning to overwrite it.
 
-发布构建不代表 Windows/arm64、多屏/混合 DPI 或 GUI 原生缺口已验收。当前自动发布链路尚未实际创建版本；实际发布需维护者推送选定标签。开发者可用 `python3 scripts/release.py package --tag v1.2.3 --dist-dir dist --output-dir .tmp/release` 本机打包，输出目录须不存在；临时文件与构建缓存均置于项目 `.tmp/`。
+On 2026-10-07, both the [main Actions run](https://github.com/kkqy/remote-mcp/actions/runs/37503153099) and the [v0.1.0 tag Actions run](https://github.com/kkqy/remote-mcp/actions/runs/37503152596) completed successfully. The public [v0.1.0 release](https://github.com/kkqy/remote-mcp/releases/tag/v0.1.0) has four archives and `SHA256SUMS`, and its assets were checked. These CI and release results do not establish native Windows/arm64, multiple-monitor, mixed-DPI or remaining GUI acceptance. Developers can package locally with `python3 scripts/release.py package --tag v1.2.3 --dist-dir dist --output-dir .tmp/release`; the output directory must not already exist. Keep temporary files and build caches in the project `.tmp/` directory.
 
 ## Build and start
 
@@ -43,7 +43,7 @@ go build -o bin/remote-mcp ./cmd/remote-mcp
 go build -o bin/remote-mcp-transfer ./cmd/remote-mcp-transfer
 ```
 
-未配置 Token 时可以直接启动。Linux：
+Start directly when no token is configured. On Linux:
 
 ```sh
 ./bin/remote-mcp
@@ -57,7 +57,7 @@ Windows PowerShell:
 
 Token authentication is optional. When `REMOTE_MCP_TOKEN` is unset or empty and `--token-file` is not specified, the service allows anonymous access: any client that can reach it can use the file and command permissions of the account running the service. If a token was previously set in your terminal, clear it before starting with `unset REMOTE_MCP_TOKEN` in Bash or `$env:REMOTE_MCP_TOKEN = $null` in PowerShell.
 
-需要鉴权时，在启动前配置非空 Token。Linux：
+For authentication, configure a nonempty token before startup. On Linux:
 
 ```sh
 export REMOTE_MCP_TOKEN='replace-with-a-random-ascii-token'
@@ -181,7 +181,7 @@ The response includes a resource ID and status. `wait_ms` is limited to 10000 mi
 
 After calling `terminal_open`, use `id` and the Base64 field `data_base64` in subsequent `terminal_write` calls. For example, Unix `pwd` followed by a carriage return is `cHdkDQ==`; Ctrl+C is `Aw==`. `terminal_read` accepts `id`, `cursor`, and an optional `limit`. Terminal output is a combined stream that preserves ANSI/VT control sequences, with no separate stderr. Repeated input through the same ID preserves the working directory, environment variables, and foreground application state.
 
-`terminal_resize` 接受 `id`、`columns` 和 `rows`。Ctrl+C 输入由前台程序自行响应，强制回收使用 `terminal_close`。Windows 使用 ConPTY，Linux 使用 PTY。终端默认无调用活动 30 分钟回收，持续输出不会延长这一时间；网络短暂断开后可凭原 ID 继续。
+`terminal_resize` accepts `id`, `columns` and `rows`. The foreground application handles Ctrl+C input; use `terminal_close` to force cleanup. Windows uses ConPTY and Linux uses PTY. Terminals are reclaimed after 30 minutes without calls by default; continuous output does not extend this period. After a brief network disconnection, continue using the original ID.
 
 ### A complete debugging workflow
 
@@ -221,54 +221,54 @@ python3 scripts/smoke.py --bin-dir dist/linux-amd64
 python3 scripts/smoke.py --bin-dir dist/linux-amd64 --no-token
 ```
 
-当前仅支持 Linux 和 Windows 的 amd64/arm64，macOS 支持已移除。构建脚本生成 `dist/{linux,windows}-{amd64,arm64}/`，每种组合含两个程序。GitHub Actions 在 Linux、Windows 执行原生测试及竞态检查，并运行真实二进制上传、执行、下载闭环，另运行四组合构建；没有执行过的 CI 不能算验证通过。
+Supported platforms are Linux and Windows on amd64/arm64; macOS support has been removed. The build script generates `dist/{linux,windows}-{amd64,arm64}/`, with two programs per combination. GitHub Actions runs native and race tests on Linux and Windows, upload/run/download cycles with real binaries, and all four build combinations. A configured CI job is not evidence that it has run successfully.
 
 Linux also requires `procps` (or the distribution's equivalent package), which provides `/bin/ps`, to identify and clean up additional terminal job groups.
 
-目标系统下限为 Windows 10 1809+/Server 2019+、Linux 3.2+ 且具有 PTY。下限来自 Go 1.27 和 ConPTY 的要求，不表示每个旧系统版本均已测试。
+Minimum target systems are Windows 10 1809+/Server 2019+, or Linux 3.2+ with PTY support. These minimums come from Go 1.27 and ConPTY requirements; they do not mean every older system version has been tested.
 
-当前开发环境为 Linux/amd64。Windows/amd64 虚拟机已通过原生包测试和真实二进制闭环，包含终端、文件替换及进程树清理；Windows/arm64 目前仅构建通过。没有前端、公网中转、多租户隔离、专用断点调试协议或自动安装系统服务功能。
+The current development environment is Linux/amd64. A Windows/amd64 VM passed native package tests and real-binary cycles, including terminals, file replacement and process-tree cleanup. Windows/arm64 has only been built. There is no frontend, public relay, tenant isolation, dedicated breakpoint debugging protocol or automatic system-service installation.
 
-Windows CI 曾发现宿主标准输入输出重定向导致 ConPTY 会话误用宿主句柄的问题，已修正启动参数，并增加管道及文件重定向宿主下的交互、Ctrl+C 和空闲回收回归。对应回归已在 Windows/amd64 虚拟机实际通过；本轮未触发远程 CI。
+Earlier Windows CI exposed a ConPTY bug that reused host handles when standard input/output was redirected. Startup parameters were corrected, with regressions for interaction, Ctrl+C and idle cleanup under pipe and file redirection. Those regressions passed on the Windows/amd64 VM. That VM validation record predates the successful Actions runs linked above; those runs do not imply that the VM tests were repeated.
 
 The recorded Linux/amd64 validation passed race tests, static analysis, an upload/run/download cycle with real binaries, and an actual 257 MiB bidirectional MCP transfer. The large-file test took approximately 29.74 seconds, with a sampled peak heap increase of about 9.46 MiB and matching SHA-256 hashes at both ends. A sampled heap increase is not equivalent to operating system RSS.
 
-## 远程调试：巡检、等待日志与文本补丁
+## Remote debugging: inspection, output waits and text patches
 
-以下能力与已有上传、执行和终端工具共用 `/mcp`、鉴权及服务账号权限，无新增 CLI 参数。
+These capabilities share `/mcp`, authentication and service-account permissions with the existing upload, execution and terminal tools. They add no CLI options.
 
-| 工具 | 用途与主要参数 |
+| Tool | Purpose and main parameters |
 | --- | --- |
-| `environment_inspect` | 系统、架构、内核、hostname；可选 `runtimes` 为 go/node/python/java/dotnet 的子集 |
-| `process_inspect` | 有界 PID/PPID/name 快照；可选 `root_pid` 返回根进程及后代 |
-| `network_listeners` | IPv4/IPv6 TCP LISTEN 地址、端口及可见 PID；可选 `pid/port/limit` |
-| `network_probe` | `mode` 为 dns/tcp/tls/http，`target` 分别为 hostname、host:port 或 HTTP(S) URL |
-| `process_read`、`terminal_read` | 新增 `wait_ms`，缺省或 0 保持立即读取，最大 30000 ms |
-| `log_open/read/close` | 跟踪已有普通日志文件；read 使用 `id/generation/cursor/limit/wait_ms` |
-| `file_list` | `path/offset/limit` 单目录分页，返回 `next_offset` 和限制原因 |
-| `file_read` | `path/start_line/line_count/max_bytes` 按行读取 UTF-8，返回全文件 `sha256` |
-| `file_search` | `path/query` 区分大小写的字面子串；可配置深度、条目、字节和命中预算 |
-| `file_patch` | `path/expected_sha256/edits` 校验原内容后修改已有普通 UTF-8 文件 |
+| `environment_inspect` | System, architecture, kernel and hostname; optional `runtimes` selects a subset of go/node/python/java/dotnet |
+| `process_inspect` | Bounded PID/PPID/name snapshot; optional `root_pid` returns that process and its descendants |
+| `network_listeners` | IPv4/IPv6 TCP LISTEN addresses, ports and visible PIDs; optional `pid/port/limit` |
+| `network_probe` | `mode` is dns/tcp/tls/http; `target` is a hostname, host:port or HTTP(S) URL as appropriate |
+| `process_read`, `terminal_read` | Optional `wait_ms`; omitted or 0 reads immediately, maximum 30000 ms |
+| `log_open/read/close` | Follow an existing regular log file; read uses `id/generation/cursor/limit/wait_ms` |
+| `file_list` | Paginate one directory with `path/offset/limit`; returns `next_offset` and limit reasons |
+| `file_read` | Read UTF-8 lines with `path/start_line/line_count/max_bytes`; returns the whole-file `sha256` |
+| `file_search` | Case-sensitive literal substring search with `path/query`; configurable depth, entry, byte and match budgets |
+| `file_patch` | Modify an existing regular UTF-8 file with `path/expected_sha256/edits` after verifying its original contents |
 
-巡检默认总预算 5 秒，`timeout_ms` 最多 10000；最多 4 个并发巡检。快照默认返回 256 项，单次最多 4096，内部 PID/FD 扫描也有界。返回 `partial/warnings/truncated/visibility` 表示权限、依赖、扫描上限或可见性缺口；空列表不证明整机没有对象。Linux 使用当前 `/proc` namespace，Windows 使用 Toolhelp 与 IP Helper；缺少依赖或权限不足提供英文代码与具体原因。运行时探测使用服务账号 PATH，不采集完整环境变量或进程命令行。
+Inspection has a default total budget of 5 seconds, with `timeout_ms` capped at 10000 and at most 4 concurrent inspections. Snapshots return 256 entries by default, up to 4096 per call; internal PID/FD scans are also bounded. `partial/warnings/truncated/visibility` indicate permission, dependency, scan-limit or visibility gaps. An empty list does not prove that no objects exist on the machine. Linux uses the current `/proc` namespace; Windows uses Toolhelp and IP Helper. Missing dependencies or permissions produce English codes and specific reasons. Runtime probes use the service account's PATH without collecting full environment variables or process command lines.
 
-网络探测沿 DNS→TCP→TLS→HTTP 共用一个 deadline。失败仍保留 `structuredContent` 中的 `stages/failed_stage/code/message`；IP 字面量可跳过 DNS。TLS 使用系统 CA 校验证书，HTTP 固定一次 GET，不走代理、不跟随重定向、不读取正文；HTTP 4xx/5xx 是有效协议响应，业务健康由调用方判断。例如：
+Network probes share one deadline across DNS→TCP→TLS→HTTP. Failures retain `stages/failed_stage/code/message` in `structuredContent`; literal IP addresses may skip DNS. TLS verifies certificates using system CAs. HTTP sends one GET without proxies, redirects or response-body reads. HTTP 4xx/5xx responses are valid protocol responses; the caller determines application health. For example:
 
 ```json
 {"name":"network_probe","arguments":{"mode":"http","target":"http://127.0.0.1:8080/health","timeout_ms":3000}}
 ```
 
-执行 read 的 `reason` 区分 `immediate/output/exit/timeout/cancelled`。原始 Base64 字节、字节游标、UTF-8 视图及截断标记继续保留；HTTP 取消只结束本次等待，不停止应用进程。先将上次 `next_cursor` 带回，再等待新输出：
+Read results distinguish `immediate/output/exit/timeout/cancelled` through `reason`. Raw Base64 bytes, byte cursors, UTF-8 views and truncation flags are retained. HTTP cancellation ends only the current wait, not the application process. Pass the previous `next_cursor` back before waiting for new output:
 
 ```json
 {"name":"process_read","arguments":{"id":"resource-id","stream":"stdout","cursor":128,"wait_ms":10000}}
 ```
 
-日志资源默认最多 32 个，空闲 10 分钟回收，文件变化约每 100 ms 检查，单次最多 64 KiB。`log_open` 返回 `generation/end_cursor`：从头读取用 cursor=0，只读取以后追加内容用 end_cursor。调用 `log_read` 时同时传回上次 `generation/next_cursor`；路径替换或缩短会重置代际与偏移，返回 `rotated/truncated`。等待式结果还可用 `reason=rotated/truncated` 表示文件变化；立即读取仍是 `immediate`，变化看布尔标记。两个采样之间瞬间截断又恢复、同一文件原地重写且尺寸没有缩短，可能无法检测；它不是文件审计协议。显式 `log_close` 或服务关闭结束资源。
+Log resources default to a maximum of 32, are reclaimed after 10 minutes of inactivity, check file changes about every 100 ms, and return at most 64 KiB per read. `log_open` returns `generation/end_cursor`: use cursor=0 to read from the beginning, or end_cursor to read only later appends. Pass the previous `generation/next_cursor` to `log_read`. Path replacement or shortening resets the generation and offset and returns `rotated/truncated`. Waiting reads can also report `reason=rotated/truncated`; immediate reads retain `immediate`, with changes indicated by boolean flags. Truncation followed by restoration between samples, or an in-place rewrite without a size decrease, may go undetected. This is not a file auditing protocol. Explicit `log_close` or service shutdown ends the resource.
 
-文件读取和修改默认最多 8 MiB，返回文本最多 64 KiB；`next_line` 是首个未完整返回的行。`truncated/reason=byte_limit` 时可在上限内提高 `max_bytes` 重读；超过 64 KiB 的长行仅提供有限 UTF-8 预览，跳过此行用 `end_line+1`，不要把重复返回的前缀盲目拼接。完整字节可使用原下载工具。搜索逐行匹配字面子串，不跨行匹配，最多 10000 条目、64 MiB 扫描、每文件 8 MiB、16 层和 1000 命中，结果也有字节预算。长行在文件扫描预算内完整匹配，返回预览可能没有展示命中位置；`issues/truncated/reason` 说明无效 UTF-8、权限失败或预算限制。目录分页采用文件系统枚举顺序，目录并发变化时 offset 会移动；不承诺稳定快照，也不跟随符号链接。
+File reads and modifications default to a maximum of 8 MiB, with at most 64 KiB of returned text. `next_line` is the first line not fully returned. For `truncated/reason=byte_limit`, increase `max_bytes` within the limit and reread. Lines longer than 64 KiB have only a bounded UTF-8 preview; skip such a line with `end_line+1` instead of blindly concatenating repeated prefixes. Use the download tools for full bytes. Search matches literal text within individual lines, never across lines, with limits of 10000 entries, 64 MiB scanned, 8 MiB per file, 16 levels and 1000 matches, plus a response-byte budget. Long lines are fully matched within the scan budget even if the preview omits the matching text. `issues/truncated/reason` explain invalid UTF-8, permission errors or budget limits. Directory pagination follows filesystem enumeration order; concurrent changes can move offsets. It does not promise a stable snapshot or follow symbolic links.
 
-补丁行号从 1 开始，按**原文件**坐标严格递增且不重叠；`total_lines+1` 可追加。`text` 是确切替换字节，调用方自行携带 LF 或 CRLF，不自动补换行。先读取全文件 hash，再发送行补丁，例如原第二行使用 CRLF：
+Patch line numbers start at 1 and must increase strictly without overlap in **original-file** coordinates; `total_lines+1` appends. `text` supplies the exact replacement bytes, including caller-provided LF or CRLF; newlines are not added automatically. Read the whole-file hash before sending a line patch, for example when the original second line uses CRLF:
 
 ```json
 {"name":"file_read","arguments":{"path":"/srv/app/config.txt","start_line":1,"line_count":20}}
@@ -278,11 +278,11 @@ The recorded Linux/amd64 validation passed race tests, static analysis, an uploa
 {"name":"file_patch","arguments":{"path":"/srv/app/config.txt","expected_sha256":"<sha256-from-file_read>","edits":[{"start_line":2,"delete_count":1,"text":"新的配置\r\n"}]}}
 ```
 
-错误哈希或已观测到的外部修改返回 `conflict` 并保留现有目标。同目录临时文件校验、同步、关闭后才原子替换，失败清理临时名称；本模块补丁串行执行。请求断开或等待取消后，应重新 `file_read` 核对实际 hash，再决定下一步，不盲目重试旧 hash。最终哈希复核与发布之间仍存在外部非合作写入窗口，不提供严格文件系统 CAS。权限保持遵循平台可移植权限位，不能把它等同于 Windows 自定义 ACL 的完整复制。取消在文件系统操作之间检查，无法强制中断已阻塞的内核文件操作。
+A wrong hash or observed external modification returns `conflict` and preserves the existing target. A temporary file in the same directory is verified, synced and closed before atomic replacement; failures clean up the temporary name. This module serializes patches. After request disconnection or wait cancellation, call `file_read` again to check the actual hash before proceeding; do not blindly retry the old hash. A non-cooperating external writer can still change the target between final hash verification and publication, so this is not strict filesystem CAS. Permission preservation uses portable platform permission bits, not a complete copy of custom Windows ACLs. Cancellation is checked between filesystem operations and cannot forcibly interrupt a blocked kernel operation.
 
-普通日志只记录工具、耗时、结果及受控英文错误码与原因，不记录文件内容、query、edits、URL、运行时版本输出或凭据。Linux 本机测试与四组无 CGO 构建分别验收，Windows/amd64 原生 PID、端口、终端和文件行为已通过虚拟机验收，Windows/arm64 仍仅构建通过；新增 P0 不消除 GUI 任务的原生验收缺口。DAP、调试会话聚合、诊断包、反向隧道和新增 GUI 留待后续。
+Regular logs record only the tool, duration, result, and controlled English error codes and reasons. They exclude file contents, query, edits, URLs, runtime version output and credentials. Local Linux tests and the four CGO-free builds are recorded separately. Native PID, port, terminal and file behavior passed on a Windows/amd64 VM; Windows/arm64 remains build-only. P0 additions do not close the remaining native GUI acceptance gaps. DAP, debugging-session aggregation, diagnostic bundles, reverse tunnels and additional GUI capabilities are deferred.
 
-真实本机二进制闭环（不访问 GUI 或公网），Linux 使用本机 Go 构建产物：
+Real-binary local validation without GUI or public-network access, using locally built Go binaries on Linux:
 
 ```sh
 CGO_ENABLED=0 go build -o bin/ ./cmd/...
@@ -292,7 +292,7 @@ python3 scripts/p0-smoke.py --bin-dir bin --report-file dist/p0-token.json
 python3 scripts/p0-smoke.py --bin-dir bin --no-token --report-file dist/p0-anonymous.json
 ```
 
-Windows PowerShell：
+Windows PowerShell:
 
 ```powershell
 $env:CGO_ENABLED = '0'
@@ -304,11 +304,11 @@ python scripts/p0-smoke.py --bin-dir bin --report-file dist/p0-token.json
 python scripts/p0-smoke.py --bin-dir bin --no-token --report-file dist/p0-anonymous.json
 ```
 
-已有四组合构建产物也可通过 `--bin-dir dist/linux-amd64` 等目录验证，目录必须对应正在运行的系统与架构。P0 冒烟覆盖工具发现、当前 PID 与监听端口、回环网络成功和失败、中文 CRLF 补丁与冲突保留、进程及真实终端的立即读取/输出等待/超时/退出、日志追加/轮转/同文件截断。服务及测试资源清理和普通日志过滤全部通过后，才输出成功摘要，并按可选 `--report-file` 保存严格 UTF-8 的有限 JSON 报告。每次运行先删除该位置的旧报告，失败不留下旧成功记录；报告只包含检查布尔值、协议及鉴权模式、服务端系统/架构和 Python 宿主系统/架构，不保存凭据、用户内容、路径、主机名或进程列表。Windows 服务停止使用 `TerminateProcess`，报告明确标注 `service_shutdown=terminate_process`，不表示服务收到信号后优雅退出。
+Existing four-combination build outputs can also be tested with directories such as `--bin-dir dist/linux-amd64`; the directory must match the running system and architecture. P0 smoke tests cover tool discovery, the current PID and listening port, loopback network success and failure, Chinese CRLF patches and conflict preservation, immediate/output-wait/timeout/exit reads for processes and real terminals, and log append/rotation/same-file truncation. Success is reported only after service and test-resource cleanup and regular-log filtering pass. Optional `--report-file` writes a bounded, strictly UTF-8 JSON report. Each run deletes any old report first; failure leaves neither stale success nor an early success result. Reports contain only check booleans, protocol and authentication mode, server system/architecture and Python host system/architecture, excluding credentials, user content, paths, hostnames and process lists. Windows stops the service with `TerminateProcess` and reports `service_shutdown=terminate_process`; this does not establish graceful signal-driven shutdown.
 
-现有 Linux/Windows CI 入口执行旧功能与 P0 的 Token/匿名四轮冒烟，原生构建步骤明确关闭 CGO，竞态检查保留所需配置，四组合构建继续独立执行；P0 报告保存到按 runner 平台命名的 artifact，成功模式分别留证。Linux/amd64 和 Windows/amd64 实际旧功能/P0 × Token/匿名四轮冒烟均通过，Windows 九个包合计 111 个顶层测试通过、4 个按平台或条件跳过。本轮未触发远程 CI；CI 配置或 artifact 名称不能代替实际结果。Windows 虚拟机缺少 Python，实际验收使用下面的 Go 助手方式，未在 Windows 执行上述 Python 冒烟脚本。Windows/arm64 只有构建结果，虚拟机没有运行 Windows race 检测，GUI 保留独立验收边界。
+The Linux/Windows CI entry point runs four smoke rounds: existing functionality and P0, each with token and anonymous modes. Native binary builds explicitly disable CGO, race checks retain their required configuration, and all four cross-build combinations run separately. P0 reports are stored in artifacts named for each runner platform, with evidence for each successful mode. Earlier Linux/amd64 and Windows/amd64 native validation passed all four rounds; the Windows VM passed 111 top-level tests across nine packages, with 4 platform- or condition-specific skips. This is a historical VM record, distinct from the successful main and v0.1.0 Actions runs linked above. The VM lacked Python, so it used the Go helper below rather than the Python smoke scripts. Windows/arm64 has only build results, the VM did not run Windows race detection, and GUI acceptance remains separate.
 
-目标 Windows 没有 Python 时，在本机通过**已授权的**现有 MCP 入口部署预编译 Go 助手：
+If the target Windows machine has no Python, deploy a precompiled Go helper through an **authorized** existing MCP endpoint from your local machine:
 
 ```sh
 python3 scripts/windows-native-smoke.py \
@@ -317,69 +317,69 @@ python3 scripts/windows-native-smoke.py \
   --report-file dist/windows-native.json
 ```
 
-该脚本只使用唯一临时目录和独立回环服务，完成后清理并重新确认原入口可用，保留原服务与配置。`--skip-package-tests` 仅跑四轮服务闭环；可重复 `--package` 选择包，`--package-only` 仅跑包测试，其报告 `protocol_smoke=false`，不能代表四轮成功。报告只含有限检查结果与上传产物哈希，不记录凭据、目录或用户内容。
+The script uses a unique temporary directory and a separate loopback service, cleans up afterward, then confirms that the original endpoint remains available. It preserves the original service and configuration. `--skip-package-tests` runs only the four service rounds; repeat `--package` to select packages, or use `--package-only` for package tests alone. Package-only reports retain `protocol_smoke=false` and do not establish four-round success. Reports contain bounded check results and uploaded-artifact hashes, without credentials, directories or user content.
 
-## Windows 图形桌面截图与操作
+## Windows desktop screenshots and input
 
-图形操作仅支持 Windows。Linux 保留文件、进程、PTY 终端、TCP 转发及远程调试工具，不提供 `gui_*` 工具或 `gui-*` 启动参数。
+GUI operations are supported only on Windows. Linux retains file, process, PTY terminal, TCP forwarding and remote debugging tools, with no `gui_*` tools or `gui-*` startup options.
 
-Windows GUI 使用原有 `/mcp` 入口、匿名或可选 Token 模式，只操作服务运行账号的当前交互桌面。请在已登录的图形会话中启动服务；后台服务、锁屏和安全桌面不保证可访问。系统 UIPI 可能拒绝向更高权限的应用输入。匿名模式下，能够连接服务的客户端也可申请桌面操作；桌面不可用不影响其他工具启动。
+Windows GUI uses the existing `/mcp` endpoint with anonymous or optional token authentication and controls only the service account's current interactive desktop. Start the service within a logged-in graphical session; background services, locked screens and secure desktops are not guaranteed to be accessible. UIPI may reject input to applications running with higher privileges. In anonymous mode, reachable clients can also request desktop operations. Desktop unavailability does not prevent other tools from starting.
 
-| 工具 | 参数与用途 |
+| Tool | Parameters and purpose |
 | --- | --- |
-| `gui_status` | `{}` 只读查询后端及能力；`{"id":"会话 ID"}` 查询会话、显示器及不可用原因 |
-| `gui_open` | `{"request_id":"desktop-001","wait_ms":10000}` 创建当前用户图形会话 |
-| `gui_close` | `{"id":"会话 ID"}` 释放资源；记录保留期内允许重复关闭 |
-| `gui_screenshot` | `id`、可选 `display_id/region`，获取整显示器或区域 PNG |
-| `gui_mouse` | `id/capture_id/action/x/y`；支持移动、点击、双击、拖拽、横纵滚动 |
-| `gui_key` | `{"id":"会话 ID","keys":["Ctrl","A"]}` 单键或组合键，自动释放本次按下的键 |
-| `gui_text` | `id/text` 与可选 `mode/paste_keys/allow_clipboard_replace`，提交 UTF-8 文本，包括中文和 emoji |
+| `gui_status` | `{}` inspects the backend and capabilities; `{"id":"session-id"}` inspects a session, displays and unavailable reasons |
+| `gui_open` | `{"request_id":"desktop-001","wait_ms":10000}` opens the current user's graphical session |
+| `gui_close` | `{"id":"session-id"}` releases resources; repeated close is safe during record retention |
+| `gui_screenshot` | `id`, optional `display_id/region`; captures a whole display or region as PNG |
+| `gui_mouse` | `id/capture_id/action/x/y`; move, click, double-click, drag, and horizontal/vertical scroll |
+| `gui_key` | `{"id":"session-id","keys":["Ctrl","A"]}` submits a key or chord and releases the keys pressed by this call |
+| `gui_text` | `id/text`, optional `mode/paste_keys/allow_clipboard_replace`; submits UTF-8 text, including Chinese and emoji |
 
-会话按 `request_id` 去重；同 ID、不同参数返回 `conflict`。一次服务最多一个待授权或可操作会话，操作正在执行时返回 `busy`。HTTP/MCP 断线不会销毁图形资源；默认无调用活动 30 分钟回收。正常退出释放桌面句柄，重启后旧 ID 失效。
+Sessions are deduplicated by `request_id`; the same ID with different parameters returns `conflict`. The service allows at most one authorizing or ready session, and returns `busy` while an operation is running. HTTP/MCP disconnection does not destroy graphical resources; sessions default to reclamation after 30 minutes without calls. Normal shutdown releases desktop handles, and restart invalidates old IDs.
 
-### 截图与坐标
+### Screenshots and coordinates
 
-打开会话后获取截图，例如：
-
-```json
-{"id":"会话 ID","display_id":"显示器 ID","region":{"x":100,"y":80,"width":640,"height":480}}
-```
-
-省略 `display_id` 时选择默认或首个显示器，省略 `region` 时获取整个显示器。截图不缩放、不拼接全部桌面。返回一个标准 MCP `image` 内容块（`mimeType: "image/png"`），以及 `structuredContent` 中的 `capture_id/display_id/width/height/region/logical_bounds/layout_generation/captured_at/captured_at_source/frame_sequence/freshness`。结构化结果不重复 PNG，图片展示需要客户端支持 MCP 图片内容。
-
-鼠标坐标以返回截图内部像素为单位，左上角为 `(0,0)`。例如在上述区域图的 `(120,50)` 单击：
+After opening a session, request a screenshot, for example:
 
 ```json
-{"id":"会话 ID","capture_id":"本次截图 ID","action":"click","x":120,"y":50,"button":"left"}
+{"id":"session-id","display_id":"display-id","region":{"x":100,"y":80,"width":640,"height":480}}
 ```
 
-服务加入裁剪偏移并按实际显示器映射转换，调用方不再自行加桌面原点或缩放。拖拽终点相对同一截图。多屏、负桌面坐标和 DPI 使用实际映射；布局改变、记录到期或淘汰后返回 `stale_capture`，应重新截图定位。
+Omitting `display_id` selects the default or first display; omitting `region` captures the whole display. Screenshots are not scaled or stitched into a combined desktop. The response contains a standard MCP `image` content block (`mimeType: "image/png"`) and `structuredContent` metadata: `capture_id/display_id/width/height/region/logical_bounds/layout_generation/captured_at/captured_at_source/frame_sequence/freshness`. Structured results do not duplicate the PNG. Displaying it requires client support for MCP image content.
 
-原生截图的 `captured_at_source` 为 `acquired_at`。输入结果的 `submitted` 仅表示事件提交，应用是否接受应再次截图或检查实际控件。取消或失败可能已经产生部分输入，结果中的 `input_may_have_applied` 提示这一情况，不应盲目重试。
-
-### 中文输入与限制
+Mouse coordinates use pixels within the returned screenshot, with `(0,0)` at its top-left corner. For example, click `(120,50)` in the region above:
 
 ```json
-{"id":"会话 ID","text":"你好，图形桌面 😀","mode":"auto"}
+{"id":"session-id","capture_id":"capture-id-from-this-screenshot","action":"click","x":120,"y":50,"button":"left"}
 ```
 
-Windows 的 `auto/direct` 使用原生 Unicode 输入，不读取或修改剪贴板。显式 `mode: "clipboard"` 返回 `unsupported`；保留的粘贴相关参数不代表支持剪贴板模式。普通日志不记录图片或输入文字。
+The service adds the crop offset and converts through the actual display mapping; callers must not add the desktop origin or scale again. Drag endpoints refer to the same screenshot. Multiple displays, negative desktop coordinates and DPI use the actual mapping. Layout changes, expiration or eviction return `stale_capture`; take a new screenshot to locate the target again.
 
-以下启动参数仅在 Windows 提供，值必须为正：
+Native screenshots use `captured_at_source: acquired_at`. An input result with `submitted` means only that events were submitted; take another screenshot or inspect the actual control to confirm application acceptance. Cancellation or failure may already have applied some input, indicated by `input_may_have_applied`; do not blindly retry.
 
-| 配置参数 | 默认值 |
+### Chinese text input and limits
+
+```json
+{"id":"session-id","text":"你好，图形桌面 😀","mode":"auto"}
+```
+
+On Windows, `auto/direct` uses native Unicode input without reading or modifying the clipboard. Explicit `mode: "clipboard"` returns `unsupported`; retained paste-related parameters do not imply clipboard-mode support. Regular logs contain neither images nor input text.
+
+The following startup options are available only on Windows, and values must be positive:
+
+| Option | Default |
 | --- | --- |
 | `--gui-idle` | `30m` |
 | `--gui-authorize-timeout` | `2m` |
 | `--gui-operation-timeout` | `30s` |
-| `--gui-max-pixels` | 16777216 个原始显示器像素 |
-| `--gui-max-png-bytes` | 16777216（16 MiB） |
+| `--gui-max-pixels` | 16777216 original display pixels |
+| `--gui-max-png-bytes` | 16777216 (16 MiB) |
 
-终态默认保留 10 分钟、最多 256 条记录；每会话最多保留 64 份坐标记录、5 分钟有效。文字上限 UTF-8 64 KiB，组合键最多 8 个，拖拽最长 10 秒。
+Final-state records default to 10-minute retention and a maximum of 256. Each session retains up to 64 coordinate records, valid for 5 minutes. Text is limited to 64 KiB of UTF-8, chords to 8 keys, and drags to 10 seconds.
 
-### 真实 Windows 桌面验证
+### Real Windows desktop validation
 
-普通无桌面 CI 只能验证代码和构建。目标 Windows 桌面启动服务后，可从 Linux 或 Windows 的 Python 宿主运行：
+CI without a desktop can validate only code and builds. After starting the service on the target Windows desktop, run the following from a Linux or Windows Python host:
 
 ```sh
 python3 scripts/gui-smoke.py --execute \
@@ -387,13 +387,13 @@ python3 scripts/gui-smoke.py --execute \
   --desktop-label 'Windows' --output-dir .tmp/gui-capture-evidence
 ```
 
-该命令使用独立 JSON-RPC 检查工具发现、后端、PNG 图片块、扫描行和采集元数据，然后关闭会话；默认只查询和截图。Token 模式使用 `REMOTE_MCP_TOKEN` 或 `--token-file`，HTTPS 可用 `--ca-file`。不带 `--execute` 只显示帮助，不连接服务。输出目录须事先不存在。
+This command uses independent JSON-RPC to check tool discovery, the backend, PNG image blocks, scanlines and capture metadata, then closes the session. It defaults to queries and screenshots only. Token mode uses `REMOTE_MCP_TOKEN` or `--token-file`; HTTPS can use `--ca-file`. Without `--execute`, it shows help without connecting. The output directory must not already exist.
 
-可用 `--input-plan .tmp/plan.json` 操作调用方已准备并置于所选显示器的专用应用。计划含 `target` 和 `operations`，工具仅限 `gui_mouse/gui_key/gui_text`；脚本补入会话 ID 和首张截图 ID。例如：
+Use `--input-plan .tmp/plan.json` to operate a dedicated application that the caller has prepared on the selected display. Plans contain `target` and `operations`, restricted to `gui_mouse/gui_key/gui_text`; the script supplies the session ID and first screenshot ID. For example:
 
 ```json
 {
-  "target":"已准备并获得焦点的专用测试编辑器",
+  "target":"A prepared and focused dedicated test editor",
   "operations":[
     {"tool":"gui_mouse","arguments":{"action":"click","x":320,"y":200}},
     {"tool":"gui_text","arguments":{"text":"中文测试"}}
@@ -401,9 +401,9 @@ python3 scripts/gui-smoke.py --execute \
 }
 ```
 
-计划默认只核验事件返回，应用结果需另行确认。若计划保存文件，可增加 `verify_text_file` 的 `path/expected`，核对事前不存在、脚本可读的 UTF-8 产物；远端文件需另行传输，远端路径不会作为本地文件读取。
+By default, plans verify only returned event results; application outcomes require separate confirmation. If a plan saves a file, add `path/expected` under `verify_text_file` to check a previously nonexistent UTF-8 artifact readable by the script. Transfer remote files separately; remote paths are not read as local files.
 
-Windows 没有 Python 时，可从本机通过已授权的匿名 MCP 入口部署 Go 专用原生窗口助手：
+When Windows has no Python, deploy a Go helper with a dedicated native window through an authorized anonymous MCP endpoint from your local machine:
 
 ```sh
 python3 scripts/windows-gui-smoke.py --execute \
@@ -412,8 +412,8 @@ python3 scripts/windows-gui-smoke.py --execute \
   --report-file .tmp/windows-gui-evidence.json
 ```
 
-脚本核对本机产物、远端文件和实际启动程序的 SHA-256。本机缓存和打包文件放项目 `.tmp/`，远端部署放 MCP 服务工作目录的 `.tmp/`；需该目录可写。用临时回环服务完成 Token/匿名两轮；仅向自己创建且确认前台和输入焦点的 Win32 窗口操作。它验证裁剪 PNG 的四色标记、真实鼠标和滚轮事件、全选清空、中文/emoji 实际进入 EDIT 控件。原生 Unicode 路线不访问剪贴板；窗口、会话、临时服务和部署目录清理后复查原 MCP 服务，再发布报告。旧功能/P0 原生入口继续默认四轮。
+The script checks SHA-256 hashes of local artifacts, remote files and the actual running programs. Local caches and packages stay in the project `.tmp/`; remote deployment uses `.tmp/` under the MCP service working directory, which must be writable. A temporary loopback service runs token and anonymous rounds. Input targets only the helper's own Win32 window after verifying foreground identity and input focus. It checks four-color markers in cropped PNGs, real mouse and wheel events, select-all and clearing, and actual Chinese/emoji text in the EDIT control. Native Unicode input never accesses the clipboard. The window, session, temporary service and deployment directory are cleaned up, and the original MCP service is checked again before publishing the report. The existing native/P0 entry point still defaults to four rounds.
 
-2026-10-07 当前构建已在 Windows/amd64 单屏 100% DPI 环境完成上述 Token/匿名原生闭环；该结果不覆盖 Windows/arm64 原生运行、多屏/混合 DPI、布局变化、撤权或实际 MCP 客户端图片展示。报告保留 `acceptance_complete: false`，构建、模拟协议及真实桌面结果分别记录。历史 Linux GUI 研究仅供追溯，不属于当前支持范围或待交付项。
+On 2026-10-07, the current build completed the token and anonymous native cycles above on Windows/amd64 with one display at 100% DPI. This does not cover native Windows/arm64, multiple monitors, mixed DPI, layout changes, permission revocation or image display in an actual MCP client. Reports retain `acceptance_complete: false`; builds, simulated protocol results and real desktop evidence are recorded separately. Historical Linux GUI research is retained for traceability, outside the current supported scope and deliverables.
 
-MCP 工具失败的普通日志保留 `tool/elapsed/failed`，并输出 `error_code/error_message`，程序自有错误原因及提示使用英文；GUI 失败还可包含 `input_may_have_applied/clipboard_restore`。例如 Windows 显式请求剪贴板模式会返回 `unsupported`，并记录具体英文原因。成功调用没有错误字段。日志只接收已知内置工具域的安全业务说明；SDK 参数失败按必填缺失、类型不符等类别说明，未知工具和异常使用安全分类，不打印原始参数、内容或错误载荷。错误说明最多 1024 字节，控制字符清理，非空 Token 及可识别的输入内容脱敏；未来自定义工具需单独建立安全日志契约才能输出原文原因。
+Regular logs for failed MCP tools retain `tool/elapsed/failed` and include `error_code/error_message`; program-owned errors and prompts are in English. GUI failures may also include `input_may_have_applied/clipboard_restore`. For example, explicitly requesting clipboard mode on Windows returns `unsupported` and logs a specific English reason. Successful calls have no error fields. Logs accept safe business explanations only from known built-in tool domains. SDK parameter failures are categorized, such as missing required fields or type mismatches; unknown tools and exceptions use safe classifications without printing raw arguments, contents or error payloads. Error explanations are limited to 1024 bytes, control characters are sanitized, and nonempty tokens and recognizable input contents are redacted. Future custom tools need a separate safe logging contract before logging original error reasons.
