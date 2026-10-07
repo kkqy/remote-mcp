@@ -37,6 +37,7 @@ type fakeDesktop struct {
 	mouseEvents                        []MouseEvent
 	key                                func(context.Context, []string) error
 	capture                            func(context.Context, Display) (Frame, error)
+	displaysHook                       func(context.Context) error
 	closed                             chan struct{}
 	closeHook                          func() error
 }
@@ -49,10 +50,16 @@ func (d *fakeDesktop) Capabilities() Capabilities {
 	defer d.mu.Unlock()
 	return copyStatus(Status{Capabilities: d.caps}).Capabilities
 }
-func (d *fakeDesktop) Displays(context.Context) ([]Display, error) {
+func (d *fakeDesktop) Displays(ctx context.Context) ([]Display, error) {
 	d.mu.Lock()
-	defer d.mu.Unlock()
-	return append([]Display{}, d.displays...), nil
+	displays, hook := append([]Display{}, d.displays...), d.displaysHook
+	d.mu.Unlock()
+	if hook != nil {
+		if err := hook(ctx); err != nil {
+			return nil, err
+		}
+	}
+	return displays, nil
 }
 func (d *fakeDesktop) Capture(ctx context.Context, display Display) (Frame, error) {
 	d.mu.Lock()
@@ -391,23 +398,112 @@ func TestInputHelpersReleaseAfterCancelAndFailure(t *testing.T) {
 func TestStatusConcurrentLayoutAndCapabilityChanges(t *testing.T) {
 	d := newFakeDesktop()
 	m, id := openFake(t, DefaultConfig(), d)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	t.Cleanup(cancel)
+	// 状态刷新与截图共用占用；闸门确定覆盖 busy，而不依赖调度碰巧重叠。
+	entered, release := make(chan struct{}), make(chan struct{})
+	d.displaysHook = func(ctx context.Context) error {
+		close(entered)
+		select {
+		case <-release:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	refreshDone := make(chan struct{})
+	refreshResult := make(chan error, 1)
+	t.Cleanup(func() {
+		cancel()
+		select {
+		case <-refreshDone:
+		case <-time.After(time.Second):
+			t.Error("状态刷新后台调用未在取消后退出")
+		}
+	})
+	go func() {
+		defer close(refreshDone)
+		_, err := m.Status(ctx, StatusInput{ID: id})
+		refreshResult <- err
+	}()
+	select {
+	case <-entered:
+	case <-ctx.Done():
+		t.Fatal("状态刷新未进入受控闸门")
+	}
+	_, err := m.Screenshot(ctx, ScreenshotInput{ID: id})
+	assertCode(t, err, "busy")
+	close(release)
+	select {
+	case err := <-refreshResult:
+		if err != nil {
+			t.Fatalf("释放闸门后状态刷新失败：%v", err)
+		}
+	case <-ctx.Done():
+		t.Fatal("释放闸门后状态刷新未完成")
+	}
+	d.mu.Lock()
+	d.displaysHook = nil
+	d.mu.Unlock()
+	initial, err := m.Status(ctx, StatusInput{ID: id})
+	if err != nil {
+		t.Fatal(err)
+	}
 	done := make(chan struct{})
+	statusResult := make(chan error, 1)
+	t.Cleanup(func() {
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(time.Second):
+			t.Error("并发状态查询未在取消后退出")
+		}
+	})
 	go func() {
 		defer close(done)
 		for i := 0; i < 300; i++ {
-			_, _ = m.Status(context.Background(), StatusInput{ID: id})
+			if _, err := m.Status(ctx, StatusInput{ID: id}); err != nil {
+				statusResult <- err
+				return
+			}
 		}
+		statusResult <- nil
 	}()
 	for i := 0; i < 20; i++ {
 		d.mu.Lock()
 		d.displays[0].LogicalBounds.X = float64(i)
 		d.caps.Reasons["mouse"] = "Layout changed"
 		d.mu.Unlock()
-		if _, err := m.Screenshot(context.Background(), ScreenshotInput{ID: id}); err != nil {
-			t.Fatal(err)
+		capture, err := m.Screenshot(ctx, ScreenshotInput{ID: id})
+		if err != nil {
+			assertCode(t, err, "busy")
+		} else if capture.CaptureID == "" || len(capture.PNG) == 0 || capture.LogicalBounds.X != float64(i) {
+			t.Fatalf("并发截图未返回当前布局及有效图片：%+v", capture)
 		}
 	}
-	<-done
+	select {
+	case <-done:
+		if err := <-statusResult; err != nil {
+			t.Fatalf("并发状态查询失败：%v", err)
+		}
+	case <-ctx.Done():
+		t.Fatal("并发状态查询未在期限内结束")
+	}
+	// 并发阶段允许合法 busy，但必须实际恢复截图并读到最新布局及能力。
+	capture, err := m.Screenshot(ctx, ScreenshotInput{ID: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, err := m.Status(ctx, StatusInput{ID: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if capture.CaptureID == "" || len(capture.PNG) == 0 || capture.LogicalBounds.X != 19 || capture.LayoutGeneration <= initial.LayoutGeneration {
+		t.Fatalf("占用释放后未完成最新布局截图：%+v", capture)
+	}
+	if len(status.Displays) != 1 || status.Displays[0].LogicalBounds.X != 19 || status.Capabilities.Reasons["mouse"] != "Layout changed" || status.LayoutGeneration != capture.LayoutGeneration {
+		t.Fatalf("并发更新后的状态未刷新：%+v", status)
+	}
 }
 func TestInvalidTextAndKeysNeverExecute(t *testing.T) {
 	d := newFakeDesktop()
