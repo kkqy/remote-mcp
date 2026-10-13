@@ -36,7 +36,7 @@ git push origin v1.2.3
 
 ## Docker 部署
 
-仓库提供 [`Dockerfile`](Dockerfile) 和 [`compose.yaml`](compose.yaml)，镜像包含服务端与 `remote-mcp-transfer`，支持 Linux amd64/arm64。运行环境保留 `/bin/sh`、Bash、完整的 `/bin/ps` 和 CA 证书；默认账号为 `10001:10001`，工作目录为 `/workspace`。额外调试工具或语言运行时需按需制作派生镜像。
+仓库提供 [`Dockerfile`](Dockerfile) 和 [`compose.yaml`](compose.yaml)，镜像包含服务端与 `remote-mcp-transfer`，支持 Linux amd64/arm64。运行环境保留 `/bin/sh`、Bash、完整的 `/bin/ps`、CA 证书和 Python 3（`python3` 与 `python` 均可调用）；默认账号为 `10001:10001`，工作目录为 `/workspace`。额外调试工具或语言运行时需按需制作派生镜像。
 
 ### 自动发布到 GHCR
 
@@ -84,7 +84,7 @@ docker compose up -d
 docker compose logs --tail=100 remote-mcp
 ```
 
-建议使用符合调试需要的普通 Linux 账号执行准备命令。模板默认 UID/GID 是 `10001:10001`，也可保留默认值并提前给该 UID/GID 授予挂载目录的写权限。绑定路径必须已经存在；模板不会自动创建由 root 持有的目录。镜像入口会在挂载目录内创建 `.tmp`，权限不足时启动失败。启用 SELinux 的宿主还需按宿主策略为挂载目录配置合适的容器访问标签。
+建议使用符合调试需要的普通 Linux 账号执行准备命令。模板默认 UID/GID 是 `10001:10001`，也可保留默认值并提前给该 UID/GID 授予挂载目录的写权限。目录映射使用 `${REMOTE_MCP_DATA_DIR:-./data}:/workspace` 简写；目录不存在时 Compose 会自动创建，但其属主可能与容器运行账号不同，建议按上面的命令提前创建。镜像入口会在挂载目录内创建 `.tmp`，权限不足时启动失败。启用 SELinux 的宿主还需按宿主策略为挂载目录配置合适的容器访问标签。
 
 | 变量 | 默认值 | 作用 |
 | --- | --- | --- |
@@ -115,7 +115,7 @@ docker compose down
 
 ### 本地构建与验证
 
-在仓库根目录运行，需 Docker Buildx；Python 3 仅供宿主验证脚本使用，不包含在运行镜像中：
+在仓库根目录运行，需 Docker Buildx；宿主验证脚本需要本机 Python 3，运行镜像也已包含 Python 3：
 
 ```sh
 docker buildx build --load -t remote-mcp:local .

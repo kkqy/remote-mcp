@@ -11,8 +11,4 @@ services:
       REMOTE_MCP_TOKEN: ${REMOTE_MCP_TOKEN:-}
     command: ["--listen", "${REMOTE_MCP_LISTEN:-0.0.0.0:8080}"]
     volumes:
-      - type: bind
-        source: ${REMOTE_MCP_DATA_DIR:-./data}
-        target: /workspace
-        bind:
-          create_host_path: false
+      - "${REMOTE_MCP_DATA_DIR:-./data}:/workspace"

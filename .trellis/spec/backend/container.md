@@ -15,7 +15,7 @@
 
 镜像地址为 `ghcr.io/<小写 github.repository>`。默认分支更新 `latest` 和 `sha-<完整提交哈希>`，v* 标签更新原样版本标签和 SHA 标签，版本标签不更新 latest。版本名与二进制发布一致，满足 `v[A-Za-z0-9][A-Za-z0-9._-]{0,62}`。事件字段经环境变量输入 shell。GHCR 登录使用内置 `GITHUB_TOKEN`，仅镜像发布作业有 `packages: write`，同 ref 发布串行且不取消正在执行的发布。镜像带 OCI source/revision 标签。
 
-Dockerfile 使用构建机原生 Go 工具链交叉编译目标 Linux 架构，无 CGO；运行镜像保留 `/bin/sh`、Bash、CA 和 procps。`internal/execution/platform_unix.go` 的子进程回收调用 `/bin/ps`，不能改为没有该依赖的 scratch 或仅 BusyBox 环境。镜像包含服务与传输辅助程序。构建上下文使用允许列表，不发送 `.git`、`.tmp`、`.env`、本地数据或任务记录。
+Dockerfile 使用构建机原生 Go 工具链交叉编译目标 Linux 架构，无 CGO；运行镜像保留 `/bin/sh`、Bash、CA、procps 和 Python 3；安装 `python-is-python3` 以同时支持 `python` 与 `python3` 命令。`internal/execution/platform_unix.go` 的子进程回收调用 `/bin/ps`，不能改为没有该依赖的 scratch 或仅 BusyBox 环境。镜像包含服务与传输辅助程序。构建上下文使用允许列表，不发送 `.git`、`.tmp`、`.env`、本地数据或任务记录。
 
 Compose 固定 `network_mode: host`，不使用 `ports` 或 `networks`，不默认配置特权、host PID 或 Docker socket。`init: true`，`restart: unless-stopped`，停止宽限 30 秒。环境变量：
 
@@ -27,7 +27,7 @@ Compose 固定 `network_mode: host`，不使用 `ports` 或 `networks`，不默�
 | `REMOTE_MCP_UID` / `REMOTE_MCP_GID` | `10001`，可匹配宿主目录属主 |
 | `REMOTE_MCP_DATA_DIR` | `./data`，预先创建并授予运行用户写权限 |
 
-宿主目录绑定至 `/workspace`，禁用自动创建宿主路径；工作目录和 HOME 为 `/workspace`。入口准备 `/workspace/.tmp` 并 exec 服务，TMPDIR/TMP/TEMP 均指向该目录。共享网络不共享宿主进程/文件系统；额外宿主路径须显式挂载。容器内命令使用镜像已有程序，需要其他运行时应派生镜像。
+目录映射使用 `${REMOTE_MCP_DATA_DIR:-./data}:/workspace` 简写，不使用 `type: bind` 长格式；不存在的宿主路径由 Compose 自动创建，建议部署前创建并配置写权限。工作目录和 HOME 为 `/workspace`。入口准备 `/workspace/.tmp` 并 exec 服务，TMPDIR/TMP/TEMP 均指向该目录。共享网络不共享宿主进程/文件系统；额外宿主路径须显式挂载。容器内命令使用镜像已有程序，需要其他运行时应派生镜像。
 
 ## 4. 验证与错误矩阵
 
@@ -35,7 +35,7 @@ Compose 固定 `network_mode: host`，不使用 `ports` 或 `networks`，不默�
 | --- | --- |
 | PR、非默认分支 push | 构建验证，无 GHCR 登录或推送 |
 | native/cross-build/container 任一失败 | 不发布镜像 |
-| 挂载源不存在 | Compose 拒绝启动，不自动建立 root 属主目录 |
+| 挂载源不存在 | Compose 自动创建目录；属主可能与运行账号不同，须确保可写 |
 | 挂载目录不可写 | 入口创建 .tmp 失败，不能假装启动成功 |
 | 非法非空 Token 或监听地址 | 应用启动校验失败 |
 | GHCR 首次发布为私有或既有包未授权 | 按实际权限拉取/推送；不能承诺匿名拉取 |

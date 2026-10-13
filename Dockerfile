@@ -17,7 +17,7 @@ RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /ou
 
 FROM debian:bookworm-slim
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates bash procps \
+    && apt-get install -y --no-install-recommends ca-certificates bash procps python3 python-is-python3 \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 remote-mcp \
     && useradd --uid 10001 --gid 10001 --home-dir /workspace --no-create-home --shell /bin/bash remote-mcp \
