@@ -180,3 +180,39 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 7: GHCR 镜像发布与 host 网络部署交付
+<!-- trellis-session: v=2 fp=a7f2dec270cb4bb2 -->
+
+**Date**: 2026-10-13
+**Task**: GHCR 镜像发布与 host 网络部署交付
+**Branch**: `codex/ghcr-docker-deploy`
+
+### Summary
+
+完成 GHCR 双架构镜像自动发布、host 网络 Compose 模板和中文部署说明；通过本机 amd64 镜像及真实 Compose 验收。用户授权提交、合并 main 和删除开发分支，本次仅处理本地 Git。
+
+### Main Changes
+
+- 增加 Dockerfile、入口、Compose 与受验证门禁约束的 GHCR 发布作业
+- 补充部署说明、容器规范和真实冒烟脚本；保留原 .opencode/package.json 改动
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c67782e` | feat: 添加 GHCR 镜像发布与 host 网络部署模板 |
+
+### Testing
+
+- [OK] actionlint、Compose、Shell/Python 语法及 diff 检查通过
+- [OK] 49 项 smoke 和 12 项发布回归通过；真实 amd64 容器鉴权、文件传输、PTY、清理及 Compose 启停持久化通过
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 远端推送后由 CI 验证 arm64 构建及实际 GHCR 发布
