@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "后端规范索引"}
+{"file": ".trellis/spec/backend/release.md", "reason": "已有发布门禁与权限契约"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "真实验收与临时目录规则"}
+{"file": ".trellis/tasks/10-13-ghcr-docker-deploy/research/docker.md", "reason": "官方配置及环境证据"}

@@ -34,6 +34,97 @@ git push origin v1.2.3
 
 2026-10-07，[main 工作流运行](https://github.com/kkqy/remote-mcp/actions/runs/37503153099)和 [v0.1.0 标签工作流运行](https://github.com/kkqy/remote-mcp/actions/runs/37503152596)均已成功完成。[v0.1.0 正式版本](https://github.com/kkqy/remote-mcp/releases/tag/v0.1.0)已公开，四个压缩包和 `SHA256SUMS` 附件核对通过。上述 CI 与发布结果不代表 Windows/arm64、多屏/混合 DPI 或 GUI 原生缺口已验收。开发者可用 `python3 scripts/release.py package --tag v1.2.3 --dist-dir dist --output-dir .tmp/release` 本机打包，输出目录须不存在；临时文件与构建缓存均置于项目 `.tmp/`。
 
+## Docker 部署
+
+仓库提供 [`Dockerfile`](Dockerfile) 和 [`compose.yaml`](compose.yaml)，镜像包含服务端与 `remote-mcp-transfer`，支持 Linux amd64/arm64。运行环境保留 `/bin/sh`、Bash、完整的 `/bin/ps` 和 CA 证书；默认账号为 `10001:10001`，工作目录为 `/workspace`。额外调试工具或语言运行时需按需制作派生镜像。
+
+### 自动发布到 GHCR
+
+默认镜像为 `ghcr.io/kkqy/remote-mcp`；fork 仓库会发布到 `ghcr.io/<小写 owner>/<小写 repo>`，部署时相应修改 `REMOTE_MCP_IMAGE`。现有 Actions 工作流执行以下规则：
+
+| 事件 | 镜像标签 |
+| --- | --- |
+| 默认分支 push | `latest`、`sha-<完整提交哈希>` |
+| `v*` 标签 push | 原始版本标签（例如 `v1.2.3`）、`sha-<完整提交哈希>` |
+| 其他分支 push、PR | 仅验证，不登录或推送 GHCR |
+
+版本标签遵守上面的二进制发布标签限制；版本标签推送不会更新 `latest`。只有 Linux/Windows 原生验证、四组合构建和实际容器验证全部通过，镜像发布作业才运行。该作业独占 `packages: write`，使用仓库内置 `GITHUB_TOKEN`，无需为 Actions 配置个人令牌；原二进制 Release 发布行为保持不变。
+
+首次发布需要先将本工作流合入默认分支并推送，再查看 Actions 中 `publish-image` 的结果。首次创建的 GHCR 包可能为私有；仓库公开不代表包自动公开。维护者可在包设置中改为公开，或保留私有并让部署账号登录。若同名包已经存在，需在包的 Actions 访问设置中授予当前仓库写入权限。工作流的 OCI source 标签关联源仓库，不会自动替已有包补授权限或更改可见性。
+
+公开包可直接拉取；私有包的部署账号需有包读取权限，并使用具有 `read:packages` 权限的个人访问令牌（classic，组织启用 SSO 时还需相应授权），例如：
+
+```sh
+read -r -s -p 'GHCR 读取令牌：' GHCR_READ_TOKEN
+printf '%s' "$GHCR_READ_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USER --password-stdin
+unset GHCR_READ_TOKEN
+```
+
+### 启动与配置
+
+主要部署目标是 Linux Docker Engine。`network_mode: host` 直接共享宿主网络，不配置 `ports` 或独立 `networks`。MCP 监听端口以及工具创建的转发端口直接占用宿主端口，需避开端口冲突。host 模式也让容器能够连接宿主回环地址服务。Docker Desktop 的 host 网络支持依赖其版本与配置，本模板未在该环境验收。
+
+将 `compose.yaml` 放入部署目录；先创建挂载目录并准备 `.env`。以下命令把容器 UID/GID 设为当前 Linux 账号，使它能写入当前账号创建的 `data`：
+
+```sh
+mkdir -p data
+umask 077
+cat > .env <<EOF
+REMOTE_MCP_IMAGE=ghcr.io/kkqy/remote-mcp:latest
+REMOTE_MCP_LISTEN=0.0.0.0:8080
+REMOTE_MCP_TOKEN=replace-with-a-random-ascii-token
+REMOTE_MCP_DATA_DIR=./data
+REMOTE_MCP_UID=$(id -u)
+REMOTE_MCP_GID=$(id -g)
+EOF
+# 将上面的 Token 替换为自己的随机值，再启动。
+docker compose config --quiet
+docker compose pull
+docker compose up -d
+docker compose logs --tail=100 remote-mcp
+```
+
+建议使用符合调试需要的普通 Linux 账号执行准备命令。模板默认 UID/GID 是 `10001:10001`，也可保留默认值并提前给该 UID/GID 授予挂载目录的写权限。绑定路径必须已经存在；模板不会自动创建由 root 持有的目录。镜像入口会在挂载目录内创建 `.tmp`，权限不足时启动失败。启用 SELinux 的宿主还需按宿主策略为挂载目录配置合适的容器访问标签。
+
+| 变量 | 默认值 | 作用 |
+| --- | --- | --- |
+| `REMOTE_MCP_IMAGE` | `ghcr.io/kkqy/remote-mcp:latest` | 可改为版本标签、SHA 标签或 digest |
+| `REMOTE_MCP_LISTEN` | `0.0.0.0:8080` | 传入服务 `--listen`；仅本机访问可用 `127.0.0.1:8080` |
+| `REMOTE_MCP_TOKEN` | 空 | 空值允许匿名访问，非空值启用 Bearer 鉴权 |
+| `REMOTE_MCP_DATA_DIR` | `./data` | 持久宿主目录，容器内对应 `/workspace` |
+| `REMOTE_MCP_UID` / `REMOTE_MCP_GID` | `10001` / `10001` | 运行账号，需能写入挂载目录 |
+
+Token 沿用应用原有语义：为空时任何能连接 MCP 入口的客户端都可使用容器运行账号的文件和命令权限。按需要使用内网/VPN、防火墙与 Token；Token 本身不加密 HTTP 链路。启动日志中的客户端配置会包含已配置的 Token，应按凭据保管；不要公开 `.env` 或完整启动日志。
+
+文件、命令与进程工具工作在容器内部。host 仅共享网络，不共享宿主 PID 或整个文件系统；`process_inspect` 的 PID 可见范围仍受容器限制。操作 `/workspace/example.txt` 对应宿主挂载目录中的 `example.txt`；要操作其他宿主路径，需明确添加所需目录挂载并配置账号权限。模板不包含 `privileged`、`pid: host` 或 Docker socket 挂载。容器中的 `/workspace` 不是针对不可信命令的独立沙箱。
+
+### 更新、回滚与停止
+
+更新前记录当前镜像 digest，可用 `docker image inspect ghcr.io/kkqy/remote-mcp:latest --format '{{json .RepoDigests}}'` 查看；生产部署可将 `.env` 的镜像固定为 `ghcr.io/kkqy/remote-mcp:v1.2.3`、`sha-<完整提交哈希>` 或 `ghcr.io/kkqy/remote-mcp@sha256:<digest>`。digest 固定实际内容；同名标签在工作流重跑后可能被重新构建。
+
+```sh
+# 修改 .env 中的 REMOTE_MCP_IMAGE 后执行；回滚使用先前记录的版本或 digest。
+docker compose pull
+docker compose up -d
+
+# 正常停止，最多等待 30 秒，让服务关闭进程、终端与传输资源。
+docker compose down
+```
+
+`init: true` 协助回收子进程，正常停止会把 SIGTERM 交给服务。文件保留在宿主挂载目录；服务重启不会恢复原进程、终端、转发规则或传输会话。更新和回滚会中断这些会话。
+
+### 本地构建与验证
+
+在仓库根目录运行，需 Docker Buildx；Python 3 仅供宿主验证脚本使用，不包含在运行镜像中：
+
+```sh
+docker buildx build --load -t remote-mcp:local .
+python3 scripts/docker-smoke.py --image remote-mcp:local
+REMOTE_MCP_IMAGE=remote-mcp:local docker compose up -d
+```
+
+冒烟验证解析 Compose 默认和自定义配置，分别在 Token/匿名模式下实际初始化 MCP、核对鉴权、上传下载文件、执行命令、操作真实 PTY、回收终端子进程并正常停止容器，临时文件只存仓库 `.tmp/`。本机验证使用当前架构；双架构发布由 Actions 的 Buildx/QEMU 构建完成。工作流文件存在或本机构建成功不代表 GHCR 已发布，应以远端 Actions 结果及包页面为准。
+
 ## 构建与启动
 
 模块最低要求 Go 1.25，默认使用 Go 1.27 构建，无需 CGO：

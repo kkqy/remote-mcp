@@ -78,6 +78,85 @@ jobs:
           path: .tmp/release/
           include-hidden-files: true
           if-no-files-found: error
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 准备容器验证临时目录
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/.tmp/temp"
+          for variable in TMPDIR TMP TEMP; do echo "$variable=$GITHUB_WORKSPACE/.tmp/temp" >> "$GITHUB_ENV"; done
+          echo 'PYTHONDONTWRITEBYTECODE=1' >> "$GITHUB_ENV"
+      - uses: docker/setup-buildx-action@v4
+      - name: 构建本机验证镜像
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: remote-mcp:smoke
+          cache-from: type=gha,scope=container
+          cache-to: type=gha,mode=max,scope=container
+      - name: 验证 Compose 和真实容器能力
+        run: |
+          docker compose config --quiet
+          python3 scripts/docker-smoke.py --image remote-mcp:smoke
+  publish-image:
+    needs: [native, cross-build, container]
+    if: >-
+      github.event_name == 'push' &&
+      (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) ||
+       startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    concurrency:
+      group: ghcr-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: 生成镜像名称与标签
+        id: image
+        env:
+          IMAGE_REPOSITORY: ${{ github.repository }}
+          IMAGE_REF_TYPE: ${{ github.ref_type }}
+          IMAGE_REF_NAME: ${{ github.ref_name }}
+          IMAGE_SHA: ${{ github.sha }}
+        run: |
+          image="ghcr.io/${IMAGE_REPOSITORY,,}"
+          tag=latest
+          if [[ "$IMAGE_REF_TYPE" == tag ]]; then
+            if [[ ! "$IMAGE_REF_NAME" =~ ^v[A-Za-z0-9][A-Za-z0-9._-]{0,62}$ ]]; then
+              echo 'Invalid release tag' >&2
+              exit 1
+            fi
+            tag="$IMAGE_REF_NAME"
+          fi
+          {
+            echo 'tags<<TAGS'
+            echo "$image:$tag"
+            echo "$image:sha-$IMAGE_SHA"
+            echo 'TAGS'
+          } >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: 发布 Linux 双架构镜像
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.image.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=publish-image
+          cache-to: type=gha,mode=max,scope=publish-image
   release:
     needs: [native, cross-build]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')

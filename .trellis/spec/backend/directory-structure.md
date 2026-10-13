@@ -16,7 +16,10 @@
 - `scripts/smoke.py`：使用实际二进制完成上传、独立协议调用、执行和下载校验。
 - `scripts/gui-smoke.py`：从任意 Python 宿主验证远端 Windows GUI 的独立 HTTP/PNG 协议。
 - `scripts/windows-gui-smoke.py` 与 `scripts/native-smoke/gui_*`：显式启用的 Windows 专用原生测试窗口及有界部署验收。
-- `.github/workflows/check.yml`：跨平台检查及受验证依赖约束的标签正式发布；配置存在不代表远端已经执行或实际发布成功。
+- `.github/workflows/check.yml`：跨平台检查、容器验证、受门禁约束的 GHCR 镜像与标签正式发布；配置存在不代表远端已经执行或实际发布成功。
+- `Dockerfile`、`.dockerignore` 与 `scripts/docker-entrypoint.sh`：双架构容器构建、构建上下文允许列表与运行目录准备。
+- `compose.yaml`：host 网络部署模板，绑定工作目录并配置运行 UID/GID。
+- `scripts/docker-smoke.py`：真实容器的协议、鉴权、传输、终端、进程清理和持久化验收。
 
 测试与所属代码放在同一包的 `_test.go` 文件。系统差异由 `_windows.go` 及带构建约束的 Unix 文件隔离。共享 `go.mod/go.sum` 的写入必须协调，不允许并行代理覆盖依赖。
 

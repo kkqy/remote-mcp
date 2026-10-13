@@ -1,0 +1,12 @@
+# 仅发送构建所需源码，排除本地凭据、缓存及任务记录。
+**
+!go.mod
+!go.sum
+!cmd/
+!cmd/**
+!internal/
+!internal/**
+!scripts/
+!scripts/docker-entrypoint.sh
+!Dockerfile
+!.dockerignore
